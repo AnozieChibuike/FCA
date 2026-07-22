@@ -1,0 +1,95 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-background text-text antialiased;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+}
+
+@layer components {
+  /* Legacy class compatibility mapping to clean solid cards */
+  .neon-text, .neon-text-cta {
+    text-shadow: none;
+    @apply text-white font-bold;
+  }
+
+  .glass-card {
+    @apply bg-surface border border-[#363431] rounded-lg shadow-card;
+  }
+
+  .glass-card-hover {
+    @apply glass-card hover:bg-surface-hover hover:border-primary/50 transition-all duration-150 cursor-pointer;
+  }
+
+  .btn-primary {
+    @apply bg-primary hover:bg-primary-dark text-white font-bold px-6 py-3 rounded-md
+           shadow-btn transition-colors duration-150 cursor-pointer active:translate-y-0.5;
+  }
+
+  .btn-cta {
+    @apply bg-primary hover:bg-primary-dark text-white font-bold px-6 py-3 rounded-md
+           shadow-btn transition-colors duration-150 cursor-pointer active:translate-y-0.5;
+  }
+
+  .btn-secondary {
+    @apply bg-[#2A2825] hover:bg-[#363431] border border-[#363431] text-white font-semibold px-5 py-2.5 rounded-md
+           transition-colors duration-150 cursor-pointer;
+  }
+
+  .input-field {
+    @apply w-full bg-[#161512] border border-[#363431] rounded-md px-4 py-3
+           text-white placeholder-text-muted focus:outline-none focus:border-primary
+           transition-colors duration-150;
+  }
+
+  .title-badge {
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-bold rounded;
+  }
+}
+
+@keyframes fet-shimmer-sweep {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.fet-shimmer-badge {
+  background: linear-gradient(
+    110deg,
+    #581c87 0%,
+    #7e22ce 25%,
+    #f3e8ff 45%,
+    #ffffff 50%,
+    #f3e8ff 55%,
+    #7e22ce 75%,
+    #581c87 100%
+  );
+  background-size: 200% 100%;
+  animation: fet-shimmer-sweep 2.2s infinite linear;
+  color: #1e0936 !important;
+  font-weight: 900 !important;
+  border: 1px solid rgba(233, 213, 255, 0.9);
+  box-shadow: 0 0 12px rgba(168, 85, 247, 0.5);
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

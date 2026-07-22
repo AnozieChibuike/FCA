@@ -1,0 +1,324 @@
+# ♟️ FUTO Chess Association (FCA) Rating & Platform Software
+
+A modern React + TypeScript platform for the **FUTO Chess Association (FCA)**. This system handles player onboarding, WhatsApp group redirection, member profiles, multi-format Elo tracking (**Blitz, Rapid, Bullet, Classical**), leaderboards, an Arbiter Console with a Lichess Arena auto-importer, and a dedicated **In Memoriam** tribute engine.
+
+---
+
+## 🌟 Key Features
+
+* **FCA Onboarding ("Become an FCA Player"):** Onboarding form collecting student credentials (Full Name, Reg Number, Department, Faculty, Lichess & Chess.com handles) with auto-redirection to the official FCA WhatsApp group upon completion.
+* **Multi-Format Elo Engine:** Tracks individual Elo ratings across **Blitz**, **Rapid**, **Bullet**, and **Classical** formats using standard FIDE Elo formulas.
+* **Member Profiles:** Displays peak ratings, lifetime statistics, linked chess handles, and earned FCA Titles (**FCM**, **FM**, **FIM**, **FGM**).
+* **Immortalized Tribute Profile (`FCA ETERNAL`):** Special database-enforced title (`FET`) reserved exclusively for **Chisom Howell**. His profile is locked from rating modifications or deletions, preserving his place in FCA history.
+* **Dynamic Leaderboards:** Multi-format rankings (Blitz/Rapid/Bullet/Classical) with departmental and faculty filters.
+* **Admin & Arbiter Console:**
+  * **Lichess Arena Auto-Importer:** One-click import for online tournaments (e.g., 70-minute Blitz Titled Tuesdays).
+  * **Unlinked Player Validation:** Cross-checks arena participants against registered FCA profiles. Games featuring unlinked Lichess handles are flagged and skipped.
+  * **OTB Manual Entry:** Interface for arbiters to record physical campus matches.
+* **About & Memorial Hub:** Includes club regulations, title milestone breakdowns, executive profiles, and the **Chisom Howell Tribute Page**.
+
+---
+
+## 🛠️ Tech Stack & Architecture
+
+* **Frontend:** React 18, TypeScript, Tailwind CSS, Lucide React (Icons)
+* **Backend & Database:** Supabase (PostgreSQL, Row Level Security, Triggers)
+* **API Integrations:** Lichess API (NDJSON streaming) & Chess.com Public API
+* **Validation:** React Hook Form, Zod
+
+---
+
+## 📁 Project Structure
+
+```text
+fca-chess-platform/
+├── src/
+│   ├── components/
+│   │   ├── Navbar.tsx
+│   │   ├── Footer.tsx
+│   │   └── MemorialBanner.tsx # Chisom Howell tribute component
+│   ├── pages/
+│   │   ├── Home.tsx          # Landing page & quick stats
+│   │   ├── JoinFCA.tsx       # Onboarding form + WhatsApp redirection
+│   │   ├── Leaderboards.tsx  # Multi-format rating leaderboards
+│   │   ├── Profile.tsx       # User profile page
+│   │   ├── Memorial.tsx      # Chisom Howell tribute page
+│   │   ├── AdminConsole.tsx  # Arbiter portal (OTB & Lichess Arena import)
+│   │   └── About.tsx         # Title thresholds, guidelines & execs
+│   ├── lib/
+│   │   ├── supabase.ts       # Supabase client initialization
+│   │   ├── elo.ts            # FIDE Elo calculation helpers
+│   │   └── lichess.ts        # Lichess API fetchers & batch processing
+│   ├── types/
+│   │   └── index.ts          # Global TypeScript types and interfaces
+│   ├── App.tsx
+│   └── main.tsx
+├── supabase/
+│   └── schema.sql            # PostgreSQL schema, RLS policies, & triggers
+├── README.md
+└── package.json
+
+
+🗄️ Database Schema & Security (Supabase PostgreSQL)
+Execute the following script in your Supabase SQL Editor:
+
+SQL
+-- Enable UUID extension
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- Enums (Includes unattainable FET Title)
+CREATE TYPE fca_title AS ENUM ('NONE', 'FCM', 'FM', 'FIM', 'FGM', 'FET');
+CREATE TYPE game_mode AS ENUM ('BLITZ', 'RAPID', 'BULLET', 'CLASSICAL');
+
+-- 1. Profiles Table
+CREATE TABLE profiles (
+    id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    fca_id VARCHAR(15) UNIQUE NOT NULL, -- e.g., 'FCA-2026-001'
+    full_name TEXT NOT NULL,
+    reg_number TEXT NOT NULL,
+    department TEXT NOT NULL,
+    faculty TEXT NOT NULL,
+    lichess_username TEXT UNIQUE,
+    chesscom_username TEXT UNIQUE,
+    whatsapp_joined BOOLEAN DEFAULT FALSE,
+    
+    -- Active Ratings
+    blitz_elo INT DEFAULT 1200,
+    rapid_elo INT DEFAULT 1200,
+    bullet_elo INT DEFAULT 1200,
+    classical_elo INT DEFAULT 1200,
+    
+    -- Peak Ratings
+    peak_blitz_elo INT DEFAULT 1200,
+    peak_rapid_elo INT DEFAULT 1200,
+    peak_bullet_elo INT DEFAULT 1200,
+    peak_classical_elo INT DEFAULT 1200,
+    
+    -- Games Played
+    blitz_games INT DEFAULT 0,
+    rapid_games INT DEFAULT 0,
+    bullet_games INT DEFAULT 0,
+    classical_games INT DEFAULT 0,
+    
+    earned_title fca_title DEFAULT 'NONE',
+    is_immortal BOOLEAN DEFAULT FALSE, -- Set TRUE for memorial profile
+    is_admin BOOLEAN DEFAULT FALSE,
+    is_arbiter BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Row Level Security (RLS) Policies
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Public profiles are viewable by everyone" 
+ON profiles FOR SELECT USING (true);
+
+CREATE POLICY "Users can update their own profile handles" 
+ON profiles FOR UPDATE TO authenticated
+USING ((SELECT auth.uid()) = id)
+WITH CHECK (
+    (SELECT auth.uid()) = id AND
+    is_admin = (SELECT is_admin FROM profiles WHERE id = auth.uid()) AND
+    is_arbiter = (SELECT is_arbiter FROM profiles WHERE id = auth.uid()) AND
+    is_immortal = FALSE -- Immortal profiles cannot be updated by normal users
+);
+
+-- 2. Prevent Elo Modifications on Immortal Profiles
+CREATE OR REPLACE FUNCTION protect_immortal_profiles()
+RETURNS TRIGGER AS $$ BEGIN     IF OLD.is_immortal = TRUE THEN         RAISE EXCEPTION 'Cannot update an immortalized FCA profile.';     END IF;     RETURN NEW; END; $$ LANGUAGE plpgsql;
+
+CREATE TRIGGER check_immortal_update
+BEFORE UPDATE ON profiles
+FOR EACH ROW EXECUTE FUNCTION protect_immortal_profiles();
+
+-- 3. Seed Chisom Howell Immortal Profile
+INSERT INTO profiles (
+    id,
+    fca_id,
+    full_name,
+    reg_number,
+    department,
+    faculty,
+    lichess_username,
+    blitz_elo,
+    rapid_elo,
+    bullet_elo,
+    classical_elo,
+    earned_title,
+    is_immortal
+) VALUES (
+    uuid_generate_v4(),
+    'FCA-ETERNAL',
+    'Chisom Howell',
+    'HONORARY',
+    'FUTO Chess Association',
+    'FUTO',
+    'chisom_howell',
+    2500, 2500, 2500, 2500,
+    'FET',
+    TRUE
+);
+
+-- 4. Game Logs Table
+CREATE TABLE games (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    white_player_id UUID REFERENCES profiles(id) NOT NULL,
+    black_player_id UUID REFERENCES profiles(id) NOT NULL,
+    mode game_mode NOT NULL,
+    result NUMERIC(2, 1) NOT NULL, -- 1.0 (White Win), 0.5 (Draw), 0.0 (Black Win)
+    is_official BOOLEAN DEFAULT TRUE,
+    source TEXT NOT NULL, -- 'OTB_MANUAL', 'LICHESS_ARENA', 'CSV_IMPORT'
+    event_name TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE games ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Games are viewable by everyone" ON games FOR SELECT USING (true);
+
+CREATE POLICY "Only admins/arbiters can insert games" 
+ON games FOR INSERT TO authenticated
+WITH CHECK (
+    EXISTS (
+        SELECT 1 FROM profiles 
+        WHERE id = (SELECT auth.uid()) AND (is_admin = TRUE OR is_arbiter = TRUE)
+    )
+);
+
+⚡ Core TypeScript Logic
+1. Lichess Arena Importer Logic (src/lib/lichess.ts)
+TypeScript
+import { supabase } from './supabase';
+import { calculateElo } from './elo';
+
+export interface ArenaImportReport {
+  processedGames: number;
+  skippedUnlinkedGames: number;
+  unlinkedUsernames: string[];
+}
+
+export async function importLichessArena(
+  arenaId: string, 
+  eventName: string
+): Promise<ArenaImportReport> {
+  // 1. Stream tournament games from Lichess API (NDJSON)
+  const res = await fetch(`[https://lichess.org/api/tournament/$](https://lichess.org/api/tournament/$){arenaId}/games`, {
+    headers: { Accept: 'application/x-ndjson' },
+  });
+
+  if (!res.ok) throw new Error('Failed to retrieve Lichess Arena data.');
+
+  const text = await res.text();
+  const rawGames = text.trim().split('\n').filter(Boolean).map((line) => JSON.parse(line));
+
+  // 2. Load registered FCA profiles (skipping immortalized profiles)
+  const { data: profiles, error } = await supabase
+    .from('profiles')
+    .select('id, lichess_username, blitz_elo, blitz_games, is_immortal')
+    .eq('is_immortal', false);
+
+  if (error || !profiles) throw new Error('Failed to load FCA member profiles.');
+
+  const profileMap = new Map(
+    profiles
+      .filter((p) => p.lichess_username)
+      .map((p) => [p.lichess_username!.toLowerCase(), p])
+  );
+
+  const report: ArenaImportReport = {
+    processedGames: 0,
+    skippedUnlinkedGames: 0,
+    unlinkedUsernames: [],
+  };
+
+  const unlinkedSet = new Set<string>();
+
+  // 3. Process completed games
+  for (const game of rawGames) {
+    const whiteHandle = game.players.white.user?.name?.toLowerCase();
+    const blackHandle = game.players.black.user?.name?.toLowerCase();
+
+    if (!whiteHandle || !blackHandle) continue;
+
+    const whiteProfile = profileMap.get(whiteHandle);
+    const blackProfile = profileMap.get(blackHandle);
+
+    // Skip games if either player is unlinked or immortalized
+    if (!whiteProfile || !blackProfile) {
+      report.skippedUnlinkedGames++;
+      if (!whiteProfile) unlinkedSet.add(whiteHandle);
+      if (!blackProfile) unlinkedSet.add(blackHandle);
+      continue;
+    }
+
+    let scoreWhite = 0.5;
+    if (game.winner === 'white') scoreWhite = 1.0;
+    else if (game.winner === 'black') scoreWhite = 0.0;
+
+    // K-factor: 40 for provisional (< 15 games), 20 for established
+    const kWhite = whiteProfile.blitz_games < 15 ? 40 : 20;
+    const kBlack = blackProfile.blitz_games < 15 ? 40 : 20;
+
+    const { newA, newB } = calculateElo(
+      whiteProfile.blitz_elo,
+      blackProfile.blitz_elo,
+      scoreWhite,
+      kWhite,
+      kBlack
+    );
+
+    // Record game entry
+    await supabase.from('games').insert({
+      white_player_id: whiteProfile.id,
+      black_player_id: blackProfile.id,
+      mode: 'BLITZ',
+      result: scoreWhite,
+      source: 'LICHESS_ARENA',
+      event_name: eventName,
+    });
+
+    // Update player ratings
+    await supabase.from('profiles').update({
+      blitz_elo: newA,
+      blitz_games: whiteProfile.blitz_games + 1,
+    }).eq('id', whiteProfile.id);
+
+    await supabase.from('profiles').update({
+      blitz_elo: newB,
+      blitz_games: blackProfile.blitz_games + 1,
+    }).eq('id', blackProfile.id);
+
+    report.processedGames++;
+  }
+
+  report.unlinkedUsernames = Array.from(unlinkedSet);
+  return report;
+}
+🏆 FCA Title Progression Rules
+Title tags are awarded automatically based on peak Elo thresholds in official FCA events:
+
+Title Name	Abbr.	Tag	Peak Elo Threshold	Status
+FCA Candidate Master	FCM	[FCM]	1600+	Attainable
+FCA Master	FM	[FM]	1800+	Attainable
+FCA International Master	FIM	[FIM]	2000+	Attainable
+FCA Grandmaster	FGM	[FGM]	2200+	Attainable
+FCA Eternal	FET	[FET]	Reserved	Unattainable (In Memoriam: Chisom Howell)
+🚀 Local Development Setup
+1. Environment Configuration
+Create a .env.local file in the project root:
+
+Code snippet
+VITE_SUPABASE_URL=[https://your-project.supabase.co](https://your-project.supabase.co)
+VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
+VITE_FCA_WHATSAPP_GROUP_URL=[https://chat.whatsapp.com/YOUR_FCA_GROUP_INVITE_LINK](https://chat.whatsapp.com/YOUR_FCA_GROUP_INVITE_LINK)
+2. Installation & Run
+Bash
+# Clone the repository
+git clone [https://github.com/futo-chess/fca-rating-platform.git](https://github.com/futo-chess/fca-rating-platform.git)
+cd fca-rating-platform
+
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
