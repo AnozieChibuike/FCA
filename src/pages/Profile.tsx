@@ -49,7 +49,7 @@ export default function Profile() {
   useEffect(() => {
     async function fetchProfile() {
       if (!id) return;
-      const { data } = await supabase.from('profiles').select('*').eq('id', id).single();
+      const { data } = await supabase.from('profiles').select('*').eq('id', id).maybeSingle();
       setPlayer(data);
       if (data) {
         setEditForm({
@@ -108,7 +108,7 @@ export default function Profile() {
       department: editForm.department,
       faculty: editForm.faculty,
     }).eq('id', player.id);
-    const { data } = await supabase.from('profiles').select('*').eq('id', player.id).single();
+    const { data } = await supabase.from('profiles').select('*').eq('id', player.id).maybeSingle();
     setPlayer(data);
     setEditing(false);
     setSaving(false);
@@ -147,7 +147,7 @@ export default function Profile() {
 
       // 4. Update profile in database
       await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', player.id);
-      const { data } = await supabase.from('profiles').select('*').eq('id', player.id).single();
+      const { data } = await supabase.from('profiles').select('*').eq('id', player.id).maybeSingle();
       setPlayer(data);
       if (isOwnProfile) await refreshProfile();
     } catch (err) {

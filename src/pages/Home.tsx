@@ -20,7 +20,7 @@ export default function Home() {
         .eq('is_immortal', false)
         .order('blitz_elo', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
       setStats({
         totalPlayers: count || 0,

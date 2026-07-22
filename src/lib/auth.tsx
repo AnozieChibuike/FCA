@@ -30,8 +30,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .from('profiles')
       .select('*')
       .eq('id', userId)
-      .single();
-    setProfile(data);
+      .maybeSingle();
+
+    if (data) {
+      setProfile(data);
+    } else {
+      const { data: userData } = await supabase.auth.getUser();
+      const currentUser = userData?.user;
+      if (currentUser) {
+        const meta = currentUser.user_metadata || {};
+        const fallbackFcaId = meta.fca_id || `FCA-${userId.substring(0, 8).toUpperCase()}`;
+        const newProfile = {
+          id: userId,
+          fca_id: fallbackFcaId,
+          full_name: meta.full_name || currentUser.email?.split('@')[0] || 'Member',
+          reg_number: meta.reg_number || 'N/A',
+          department: meta.department || 'N/A',
+          faculty: meta.faculty || 'N/A',
+          phone: meta.phone || null,
+          status: meta.status || 'PENDING',
+          is_admin: meta.is_admin === true || meta.is_admin === 'true',
+          is_arbiter: meta.is_arbiter === true || meta.is_arbiter === 'true',
+        };
+        const { data: created } = await supabase
+          .from('profiles')
+          .insert(newProfile)
+          .select('*')
+          .maybeSingle();
+        setProfile(created || (newProfile as unknown as Profile));
+      } else {
+        setProfile(null);
+      }
+    }
     setLoading(false);
   }, []);
 
