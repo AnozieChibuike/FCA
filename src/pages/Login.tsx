@@ -62,11 +62,14 @@ export default function Login() {
         return;
       }
 
+      const fcaId = `FCA-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9000) + 1000)}`;
+
       const metadata: Record<string, unknown> = {
         full_name: fullName,
         reg_number: regNumber,
         department,
         faculty,
+        fca_id: fcaId,
       };
 
       if (invitedRole === 'ADMIN') {

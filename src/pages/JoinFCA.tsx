@@ -63,9 +63,9 @@ export default function JoinFCA() {
       reg_number: details.regNumber,
       department: details.department,
       faculty: details.faculty,
-      phone: details.phone || '',
-      lichess_username: details.lichessUsername || '',
-      chesscom_username: details.chesscomUsername || '',
+      phone: details.phone || null,
+      lichess_username: details.lichessUsername || null,
+      chesscom_username: details.chesscomUsername || null,
       fca_id: fcaId,
       status: 'PENDING',
     });

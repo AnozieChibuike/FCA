@@ -111,20 +111,37 @@ FOR EACH ROW EXECUTE FUNCTION protect_immortal_profiles();
 -- 4. Auto-create profile on signup via trigger
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER AS $$
+DECLARE
+    gen_fca_id VARCHAR(15);
 BEGIN
-    INSERT INTO profiles (id, fca_id, full_name, reg_number, department, faculty, phone, status, is_admin, is_arbiter)
+    IF NEW.raw_user_meta_data->>'fca_id' IS NOT NULL AND NEW.raw_user_meta_data->>'fca_id' <> '' THEN
+        gen_fca_id := NEW.raw_user_meta_data->>'fca_id';
+    ELSE
+        gen_fca_id := 'FCA-' || UPPER(SUBSTRING(NEW.id::text FROM 1 FOR 8));
+    END IF;
+
+    INSERT INTO profiles (
+        id, fca_id, full_name, reg_number, department, faculty, phone, 
+        lichess_username, chesscom_username, status, is_admin, is_arbiter
+    )
     VALUES (
         NEW.id,
-        COALESCE(NEW.raw_user_meta_data->>'fca_id', 'FCA-PENDING'),
+        gen_fca_id,
         COALESCE(NEW.raw_user_meta_data->>'full_name', 'Unknown'),
         COALESCE(NEW.raw_user_meta_data->>'reg_number', 'N/A'),
         COALESCE(NEW.raw_user_meta_data->>'department', 'N/A'),
         COALESCE(NEW.raw_user_meta_data->>'faculty', 'N/A'),
-        COALESCE(NEW.raw_user_meta_data->>'phone', ''),
+        NULLIF(NEW.raw_user_meta_data->>'phone', ''),
+        NULLIF(NEW.raw_user_meta_data->>'lichess_username', ''),
+        NULLIF(NEW.raw_user_meta_data->>'chesscom_username', ''),
         COALESCE((NEW.raw_user_meta_data->>'status')::player_status, 'PENDING'),
         COALESCE((NEW.raw_user_meta_data->>'is_admin')::boolean, FALSE),
         COALESCE((NEW.raw_user_meta_data->>'is_arbiter')::boolean, FALSE)
-    );
+    )
+    ON CONFLICT (id) DO NOTHING;
+
+    RETURN NEW;
+EXCEPTION WHEN OTHERS THEN
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
