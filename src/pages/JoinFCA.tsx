@@ -76,8 +76,8 @@ export default function JoinFCA() {
       return;
     }
 
-    setStep(3);
     setLoading(false);
+    navigate('/profile');
   }
 
   if (step === 3) {

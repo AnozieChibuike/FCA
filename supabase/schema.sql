@@ -146,6 +146,18 @@ EXCEPTION WHEN OTHERS THEN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+CREATE OR REPLACE FUNCTION auto_confirm_user_email()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.email_confirmed_at := COALESCE(NEW.email_confirmed_at, NOW());
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER auto_confirm_email_trigger
+  BEFORE INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION auto_confirm_user_email();
+
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION handle_new_user();

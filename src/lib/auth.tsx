@@ -102,16 +102,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signUp(email: string, password: string, metadata: Record<string, unknown>) {
-    const { error } = await supabase.auth.signUp({
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
       options: { data: metadata },
     });
-    if (error) return { error };
+    if (signUpError) return { error: signUpError };
 
-    // Auto-login after signup (email is auto-confirmed via DB trigger)
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-    return { error: signInError };
+    // 1. If signUp returned an active session directly, set context and fetch profile immediately
+    if (signUpData?.session) {
+      setSession(signUpData.session);
+      setUser(signUpData.session.user);
+      await fetchProfile(signUpData.session.user.id);
+      return { error: null };
+    }
+
+    // 2. Otherwise auto-login via signInWithPassword
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+    if (signInError) return { error: signInError };
+
+    if (signInData?.session) {
+      setSession(signInData.session);
+      setUser(signInData.session.user);
+      await fetchProfile(signInData.session.user.id);
+    }
+
+    return { error: null };
   }
 
   async function signOut() {
