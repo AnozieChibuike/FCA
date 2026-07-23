@@ -54,23 +54,21 @@ export async function verifyChesscomOwnership(
   const player = await fetchChesscomPlayer(username);
 
   const locationText = player.location?.toUpperCase() || '';
-  const statusText = player.status?.toUpperCase() || '';
-  const nameText = player.name?.toUpperCase() || '';
   const codeToFind = expectedCode.toUpperCase();
 
-  const codeFound = locationText.includes(codeToFind) || statusText.includes(codeToFind) || nameText.includes(codeToFind);
+  const codeFound = locationText.includes(codeToFind);
 
   if (codeFound) {
     return {
       verified: true,
       player,
-      message: `Account ownership verified! Found "${expectedCode}" on @${player.username}'s profile.`,
+      message: `Account ownership verified! Found "${expectedCode}" in @${player.username}'s Location field.`,
     };
   } else {
     return {
       verified: false,
       player,
-      message: `Verification code "${expectedCode}" was not found in @${player.username}'s profile location or status. Please paste it into your Chess.com location/bio and try again.`,
+      message: `Verification code "${expectedCode}" was not found in @${player.username}'s Location field. Go to Chess.com > Profile Settings > Details, set Location to "${expectedCode}", click Save, and try again.`,
     };
   }
 }

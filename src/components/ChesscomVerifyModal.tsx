@@ -149,7 +149,7 @@ export default function ChesscomVerifyModal({
             <ol className="list-decimal list-inside space-y-1.5 text-text-muted leading-relaxed">
               <li>Copy the verification code above.</li>
               <li>
-                Open your{' '}
+                Open{' '}
                 <a
                   href="https://www.chess.com/settings/profile"
                   target="_blank"
@@ -159,8 +159,8 @@ export default function ChesscomVerifyModal({
                   Chess.com Profile Settings <ExternalLink className="w-3 h-3" />
                 </a>
               </li>
-              <li>Paste code into your <strong>Location</strong> or <strong>Bio</strong> field and click Save.</li>
-              <li>Click <strong>Verify Ownership</strong> below.</li>
+              <li>Go to <strong>Details</strong> tab and change <strong>Location</strong> to the code.</li>
+              <li>Click <strong>Save</strong> on Chess.com, then click <strong>Verify Ownership</strong> below.</li>
             </ol>
           </div>
 
