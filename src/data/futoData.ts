@@ -105,14 +105,16 @@ export const FUTO_FACULTIES: FUTOFaculty[] = [
     ]
   },
   {
-    code: 'SMAT',
-    name: 'School of Management Technology (SMAT)',
+    code: 'SLIT',
+    name: 'School of Logistics and Information Technology (SLIT)',
     departments: [
       'Entrepreneurship and Innovation',
       'Financial Management Technology',
       'Logistics and Transport Technology',
       'Maritime Technology and Logistics',
-      'Project Management Technology'
+      'Project Management Technology',
+      'Logistics and Supply Chain Management'
+
     ]
   }
 ];
