@@ -23,15 +23,21 @@ export const FUTO_FACULTIES: FUTOFaculty[] = [
       'Biomedical Engineering',
       'Chemical Engineering',
       'Civil Engineering',
-      'Computer Engineering',
-      'Electrical/Power Systems Engineering',
-      'Electronic Engineering',
       'Food Science and Technology',
       'Material and Metallurgical Engineering',
       'Mechanical Engineering',
-      'Mechatronics Engineering',
       'Petroleum Engineering',
-      'Polymer and Textile Engineering',
+      'Polymer and Textile Engineering'
+    ]
+  },
+  {
+    code: 'SESET',
+    name: 'School of Electrical Systems Engineering and Technology (SESET)',
+    departments: [
+      'Computer Engineering',
+      'Electrical/Power Systems Engineering',
+      'Electronic Engineering',
+      'Mechatronics Engineering',
       'Telecommunications Engineering'
     ]
   },
