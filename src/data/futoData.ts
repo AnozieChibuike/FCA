@@ -106,7 +106,7 @@ export const FUTO_FACULTIES: FUTOFaculty[] = [
   },
   {
     code: 'SLIT',
-    name: 'School of Logistics and Information Technology (SLIT)',
+    name: 'School of Logistics and Innovation Technology (SLIT)',
     departments: [
       'Entrepreneurship and Innovation',
       'Financial Management Technology',
