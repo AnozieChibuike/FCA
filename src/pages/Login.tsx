@@ -94,11 +94,11 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 pt-24 pb-12">
-      <div className="bg-surface border border-chess-border p-8 rounded-lg shadow-card w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center px-4 pt-22 sm:pt-28 pb-12">
+      <div className="bg-surface border border-chess-border p-5 sm:p-8 rounded-lg shadow-card w-full max-w-md">
         <div className="text-center mb-6">
           <img src={fcaLogo} alt="FCA Logo" className="w-12 h-12 object-contain mx-auto mb-3" />
-          <h1 className="font-extrabold text-2xl text-white">
+          <h1 className="font-extrabold text-xl sm:text-2xl text-white">
             {mode === 'login' ? 'Welcome Back' : 'Become an FCA Player'}
           </h1>
           {inviteToken && (
@@ -131,7 +131,7 @@ export default function Login() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="input-field text-sm"
+                className="input-field"
                 placeholder="you@example.com"
                 required
               />
@@ -146,7 +146,7 @@ export default function Login() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="input-field text-sm"
+                className="input-field"
                 placeholder="••••••••"
                 required
                 minLength={6}
@@ -156,7 +156,7 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full btn-primary flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+              className="w-full btn-primary min-h-[46px] flex items-center justify-center gap-2 text-sm sm:text-base font-bold disabled:opacity-50 disabled:cursor-not-allowed mt-2"
             >
               {loading ? (
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -178,7 +178,7 @@ export default function Login() {
                   type="text"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  className="input-field text-sm"
+                  className="input-field"
                   placeholder="e.g. Magnus Carlsen"
                   required
                 />
@@ -191,7 +191,7 @@ export default function Login() {
                     setFaculty(e.target.value);
                     setDepartment('');
                   }}
-                  className="input-field text-sm cursor-pointer appearance-none"
+                  className="input-field cursor-pointer appearance-none"
                   required
                 >
                   <option value="">Select School/Faculty...</option>
@@ -206,7 +206,7 @@ export default function Login() {
                 <select
                   value={department}
                   onChange={(e) => setDepartment(e.target.value)}
-                  className="input-field text-sm cursor-pointer appearance-none"
+                  className="input-field cursor-pointer appearance-none"
                   required
                   disabled={!faculty}
                 >
@@ -222,7 +222,7 @@ export default function Login() {
                   type="text"
                   value={regNumber}
                   onChange={(e) => setRegNumber(e.target.value)}
-                  className="input-field text-sm"
+                  className="input-field"
                   placeholder="e.g., 20221234567"
                   required
                 />
@@ -233,7 +233,7 @@ export default function Login() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="input-field text-sm"
+                  className="input-field"
                   placeholder="you@example.com"
                   required
                 />
@@ -241,7 +241,7 @@ export default function Login() {
 
               <button
                 type="submit"
-                className="w-full btn-primary flex items-center justify-center gap-2 mt-4"
+                className="w-full btn-primary min-h-[46px] flex items-center justify-center gap-2 text-sm sm:text-base font-bold mt-4"
               >
                 Next Step <ArrowRight className="w-4 h-4" />
               </button>
@@ -255,7 +255,7 @@ export default function Login() {
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="input-field text-sm pr-10"
+                    className="input-field pr-12"
                     placeholder="••••••••"
                     required
                     minLength={6}
@@ -263,7 +263,7 @@ export default function Login() {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-white transition-colors"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 min-w-[44px] min-h-[44px] text-text-muted hover:text-white transition-colors flex items-center justify-center cursor-pointer"
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -276,7 +276,7 @@ export default function Login() {
                   type={showPassword ? 'text' : 'password'}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="input-field text-sm"
+                  className="input-field"
                   placeholder="••••••••"
                   required
                   minLength={6}
@@ -287,14 +287,14 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => setSignupStep(1)}
-                  className="btn-secondary flex items-center justify-center gap-1.5 px-4"
+                  className="btn-secondary min-h-[46px] flex items-center justify-center gap-1.5 px-4"
                 >
                   <ArrowLeft className="w-4 h-4" /> Back
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex-1 btn-primary flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 btn-primary min-h-[46px] flex items-center justify-center gap-2 text-sm sm:text-base font-bold disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading ? (
                     <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />

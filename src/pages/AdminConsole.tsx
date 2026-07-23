@@ -27,6 +27,7 @@ export default function AdminConsole() {
   const [error, setError] = useState('');
 
   const [previewGames, setPreviewGames] = useState<PreviewGame[]>([]);
+  const [linked, setLinked] = useState<string[]>([]);
   const [unlinked, setUnlinked] = useState<string[]>([]);
   const [totalRaw, setTotalRaw] = useState(0);
   const [alreadyImportedCount, setAlreadyImportedCount] = useState(0);
@@ -125,6 +126,7 @@ export default function AdminConsole() {
     try {
       const result = await fetchAndPreviewArena(cleanedId);
       setPreviewGames(result.games);
+      setLinked(result.linkedUsernames);
       setUnlinked(result.unlinkedUsernames);
       setTotalRaw(result.totalRawGames);
       setAlreadyImportedCount(result.alreadyImportedCount);
@@ -159,6 +161,7 @@ export default function AdminConsole() {
     setEventName('');
     setStep('form');
     setPreviewGames([]);
+    setLinked([]);
     setUnlinked([]);
     setTotalRaw(0);
     setAlreadyImportedCount(0);
@@ -302,19 +305,19 @@ export default function AdminConsole() {
   const playableGamesCount = previewGames.filter(g => !g.isAlreadyImported).length;
 
   return (
-    <div className="min-h-screen px-4 md:px-6 pt-28 pb-16">
+    <div className="min-h-screen px-4 sm:px-6 pt-22 sm:pt-28 pb-12 sm:pb-16">
       <div className="max-w-5xl mx-auto">
-        <div className="text-center mb-6">
-          <Swords className="w-10 h-10 text-cta mx-auto mb-4" />
-          <h1 className="font-heading text-3xl tracking-wider mb-3">Arbiter Console</h1>
-          <p className="text-text-muted">Import online Lichess Arenas or log official Over-The-Board campus matches</p>
+        <div className="text-center mb-6 sm:mb-8">
+          <Swords className="w-9 h-9 sm:w-10 sm:h-10 text-cta mx-auto mb-3 sm:mb-4" />
+          <h1 className="font-heading text-2xl sm:text-3xl tracking-wider mb-2 sm:mb-3">Arbiter Console</h1>
+          <p className="text-text-muted text-xs sm:text-sm">Import online Lichess Arenas or log official Over-The-Board campus matches</p>
         </div>
 
         {/* Tab Switcher */}
-        <div className="flex items-center justify-center gap-3 mb-8">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2.5 mb-6 sm:mb-8">
           <button
             onClick={() => { setActiveTab('arena'); setError(''); }}
-            className={`px-5 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer ${
+            className={`px-4 sm:px-5 py-2.5 min-h-[44px] rounded-lg text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer select-none active:scale-[0.98] ${
               activeTab === 'arena'
                 ? 'bg-primary text-white shadow-md'
                 : 'bg-surface text-text-muted border border-chess-border hover:text-white'
@@ -326,7 +329,7 @@ export default function AdminConsole() {
 
           <button
             onClick={() => { setActiveTab('otb'); setError(''); }}
-            className={`px-5 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer ${
+            className={`px-4 sm:px-5 py-2.5 min-h-[44px] rounded-lg text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer select-none active:scale-[0.98] ${
               activeTab === 'otb'
                 ? 'bg-primary text-white shadow-md'
                 : 'bg-surface text-text-muted border border-chess-border hover:text-white'
@@ -638,21 +641,40 @@ export default function AdminConsole() {
               </div>
             )}
 
-            {unlinked.length > 0 && (
-              <div className="glass-card p-5 mb-6 border-l-4 border-l-yellow-400">
-                <h3 className="text-sm font-medium text-yellow-400 mb-2 flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4" />
-                  {unlinked.length} Unlinked Players Skipped
-                </h3>
-                <div className="flex flex-wrap gap-2">
-                  {unlinked.map((u) => (
-                    <span key={u} className="px-3 py-1 rounded-full bg-surface text-text-muted text-xs border border-chess-border">
-                      {u}
-                    </span>
-                  ))}
+            {/* Linked & Unlinked Players Fields */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              {linked.length > 0 && (
+                <div className="glass-card p-4 sm:p-5 border-l-4 border-l-emerald-500 bg-emerald-950/20">
+                  <h3 className="text-xs sm:text-sm font-bold text-emerald-400 mb-2.5 flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                    {linked.length} Linked FCA Players Spotted
+                  </h3>
+                  <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto no-scrollbar">
+                    {linked.map((u) => (
+                      <span key={u} className="px-2.5 py-1 rounded-full bg-emerald-950/80 text-emerald-300 text-xs font-mono border border-emerald-500/40">
+                        @{u}
+                      </span>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+
+              {unlinked.length > 0 && (
+                <div className="glass-card p-4 sm:p-5 border-l-4 border-l-yellow-400 bg-yellow-950/10">
+                  <h3 className="text-xs sm:text-sm font-bold text-yellow-400 mb-2.5 flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-yellow-400 flex-shrink-0" />
+                    {unlinked.length} Unlinked Players Skipped
+                  </h3>
+                  <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto no-scrollbar">
+                    {unlinked.map((u) => (
+                      <span key={u} className="px-2.5 py-1 rounded-full bg-[#161512] text-text-muted text-xs font-mono border border-chess-border">
+                        @{u}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
 
             {previewGames.length === 0 ? (
               <div className="glass-card p-10 text-center">
@@ -664,12 +686,12 @@ export default function AdminConsole() {
               </div>
             ) : (
               <div className="space-y-3">
-                <div className="glass-card p-4 flex items-center text-xs text-text-muted font-medium">
+                <div className="hidden md:flex glass-card p-4 items-center text-xs text-text-muted font-medium">
                   <span className="w-8 text-center">#</span>
                   <span className="flex-1 ml-3">White</span>
-                  <span className="w-24 text-center">Result</span>
+                  <span className="w-28 text-center">Result</span>
                   <span className="flex-1 mr-3 text-right">Black</span>
-                  <span className="w-36 text-center hidden md:block">Lichess Link</span>
+                  <span className="w-28 text-center">Lichess Link</span>
                 </div>
 
                 {previewGames.map((game, i) => {
@@ -679,58 +701,155 @@ export default function AdminConsole() {
                   return (
                     <div
                       key={i}
-                      className={`glass-card p-4 flex items-center gap-3 text-sm transition-colors ${
-                        game.isAlreadyImported ? 'opacity-60 bg-[#1e1c19]' : ''
+                      className={`glass-card p-4 transition-colors border-emerald-500/30 bg-emerald-950/10 ${
+                        game.isAlreadyImported ? 'opacity-60 bg-[#1e1c19] border-chess-border' : ''
                       }`}
                     >
-                      <span className="w-8 text-center text-text-muted text-xs">{i + 1}</span>
-
-                      <div className="flex-1 min-w-0 ml-3">
-                        <p className="font-medium text-white truncate">{game.whitePlayer.full_name}</p>
-                        <p className="text-text-muted text-xs">
-                          {game.whiteEloOld} {whiteEloDiff !== 0 && !game.isAlreadyImported && (
-                            <span className={whiteEloDiff > 0 ? 'text-green-400' : 'text-red-400'}>
-                              ({whiteEloDiff > 0 ? '+' : ''}{whiteEloDiff})
+                      {/* MOBILE VIEW (< md): Stacked non-overlapping layout */}
+                      <div className="md:hidden space-y-3">
+                        <div className="flex items-center justify-between border-b border-chess-border/60 pb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-mono text-text-muted bg-[#161512] px-2 py-0.5 rounded border border-chess-border">
+                              #{i + 1}
                             </span>
-                          )}
-                        </p>
+                            <span className={`px-2.5 py-0.5 rounded text-xs font-bold ${
+                              game.result === 1.0 ? 'bg-emerald-950 text-emerald-300 border border-emerald-600' :
+                              game.result === 0.0 ? 'bg-red-950 text-red-300 border border-red-700' :
+                              'bg-yellow-950 text-yellow-300 border border-yellow-700'
+                            }`}>
+                              {game.resultLabel}
+                            </span>
+                            {game.isAlreadyImported && (
+                              <span className="text-[10px] bg-amber-950/80 text-amber-300 border border-amber-600/60 px-1.5 py-0.5 rounded font-semibold">
+                                Already Imported
+                              </span>
+                            )}
+                          </div>
+
+                          <a
+                            href={game.externalUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-xs text-primary hover:underline font-medium"
+                          >
+                            <span>Lichess</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                          {/* White Player Mobile Card */}
+                          <div className="bg-[#161512] p-3 rounded-md border border-emerald-500/30 flex flex-col justify-between">
+                            <div>
+                              <div className="flex items-center gap-1.5 mb-1">
+                                <span className="w-2.5 h-2.5 rounded-full bg-white border border-gray-400 flex-shrink-0" />
+                                <span className="text-xs font-bold text-emerald-400 truncate">{game.whitePlayer.full_name}</span>
+                                <Check className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                              </div>
+                              <p className="text-[11px] text-emerald-300 font-mono">@{game.whiteLichessHandle || game.whitePlayer.lichess_username}</p>
+                            </div>
+                            <p className="text-xs text-text-muted mt-2 font-medium">
+                              Elo: <span className="text-white font-semibold">{game.whiteEloOld}</span>
+                              {whiteEloDiff !== 0 && !game.isAlreadyImported && (
+                                <span className={whiteEloDiff > 0 ? 'text-emerald-400 font-bold ml-1' : 'text-red-400 font-bold ml-1'}>
+                                  ({whiteEloDiff > 0 ? '+' : ''}{whiteEloDiff})
+                                </span>
+                              )}
+                            </p>
+                          </div>
+
+                          {/* Black Player Mobile Card */}
+                          <div className="bg-[#161512] p-3 rounded-md border border-emerald-500/30 flex flex-col justify-between">
+                            <div>
+                              <div className="flex items-center gap-1.5 mb-1">
+                                <span className="w-2.5 h-2.5 rounded-full bg-gray-900 border border-gray-600 flex-shrink-0" />
+                                <span className="text-xs font-bold text-emerald-400 truncate">{game.blackPlayer.full_name}</span>
+                                <Check className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                              </div>
+                              <p className="text-[11px] text-emerald-300 font-mono">@{game.blackLichessHandle || game.blackPlayer.lichess_username}</p>
+                            </div>
+                            <p className="text-xs text-text-muted mt-2 font-medium">
+                              Elo: <span className="text-white font-semibold">{game.blackEloOld}</span>
+                              {blackEloDiff !== 0 && !game.isAlreadyImported && (
+                                <span className={blackEloDiff > 0 ? 'text-emerald-400 font-bold ml-1' : 'text-red-400 font-bold ml-1'}>
+                                  ({blackEloDiff > 0 ? '+' : ''}{blackEloDiff})
+                                </span>
+                              )}
+                            </p>
+                          </div>
+                        </div>
                       </div>
 
-                      <div className="w-24 text-center flex flex-col items-center gap-1">
-                        <span className={`px-2 py-0.5 rounded text-[11px] font-bold
-                          ${game.result === 1.0 ? 'bg-green-950 text-green-300 border border-green-700' :
-                            game.result === 0.0 ? 'bg-red-950 text-red-300 border border-red-700' :
-                            'bg-yellow-950 text-yellow-300 border border-yellow-700'}`}>
-                          {game.resultLabel}
-                        </span>
-                        {game.isAlreadyImported && (
-                          <span className="text-[10px] bg-amber-950/80 text-amber-300 border border-amber-600/60 px-1.5 py-0.2 rounded font-semibold">
-                            Already Imported
+                      {/* DESKTOP VIEW (>= md): Full horizontal row */}
+                      <div className="hidden md:flex md:items-center md:gap-3 text-sm">
+                        <span className="w-8 text-center text-text-muted text-xs font-mono">{i + 1}</span>
+
+                        {/* White Player */}
+                        <div className="flex-1 min-w-0 ml-2">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-400 bg-emerald-950/80 border border-emerald-500/40 px-2 py-0.5 rounded">
+                              <Check className="w-3 h-3 text-emerald-400 flex-shrink-0" />
+                              <span className="truncate">{game.whitePlayer.full_name}</span>
+                            </span>
+                            <span className="text-[10px] text-emerald-300 font-mono bg-emerald-950/50 border border-emerald-500/20 px-1.5 py-0.2 rounded">
+                              @{game.whiteLichessHandle || game.whitePlayer.lichess_username}
+                            </span>
+                          </div>
+                          <p className="text-text-muted text-xs mt-1">
+                            {game.whiteEloOld} {whiteEloDiff !== 0 && !game.isAlreadyImported && (
+                              <span className={whiteEloDiff > 0 ? 'text-emerald-400 font-semibold' : 'text-red-400 font-semibold'}>
+                                ({whiteEloDiff > 0 ? '+' : ''}{whiteEloDiff})
+                              </span>
+                            )}
+                          </p>
+                        </div>
+
+                        {/* Result */}
+                        <div className="w-28 text-center flex flex-col items-center gap-1">
+                          <span className={`px-2.5 py-0.5 rounded text-[11px] font-bold
+                            ${game.result === 1.0 ? 'bg-emerald-950 text-emerald-300 border border-emerald-600' :
+                              game.result === 0.0 ? 'bg-red-950 text-red-300 border border-red-700' :
+                              'bg-yellow-950 text-yellow-300 border border-yellow-700'}`}>
+                            {game.resultLabel}
                           </span>
-                        )}
-                      </div>
-
-                      <div className="flex-1 min-w-0 mr-3 text-right">
-                        <p className="font-medium text-white truncate">{game.blackPlayer.full_name}</p>
-                        <p className="text-text-muted text-xs">
-                          {game.blackEloOld} {blackEloDiff !== 0 && !game.isAlreadyImported && (
-                            <span className={blackEloDiff > 0 ? 'text-green-400' : 'text-red-400'}>
-                              ({blackEloDiff > 0 ? '+' : ''}{blackEloDiff})
+                          {game.isAlreadyImported && (
+                            <span className="text-[10px] bg-amber-950/80 text-amber-300 border border-amber-600/60 px-1.5 py-0.2 rounded font-semibold">
+                              Already Imported
                             </span>
                           )}
-                        </p>
-                      </div>
+                        </div>
 
-                      <div className="w-36 text-center hidden md:block">
-                        <a
-                          href={game.externalUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1 text-xs text-primary hover:text-primary-light hover:underline font-medium"
-                        >
-                          <span>Lichess</span>
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
+                        {/* Black Player */}
+                        <div className="flex-1 min-w-0 mr-2 text-right">
+                          <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                            <span className="text-[10px] text-emerald-300 font-mono bg-emerald-950/50 border border-emerald-500/20 px-1.5 py-0.2 rounded">
+                              @{game.blackLichessHandle || game.blackPlayer.lichess_username}
+                            </span>
+                            <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-400 bg-emerald-950/80 border border-emerald-500/40 px-2 py-0.5 rounded">
+                              <span className="truncate">{game.blackPlayer.full_name}</span>
+                              <Check className="w-3 h-3 text-emerald-400 flex-shrink-0" />
+                            </span>
+                          </div>
+                          <p className="text-text-muted text-xs mt-1">
+                            {game.blackEloOld} {blackEloDiff !== 0 && !game.isAlreadyImported && (
+                              <span className={blackEloDiff > 0 ? 'text-emerald-400 font-semibold' : 'text-red-400 font-semibold'}>
+                                ({blackEloDiff > 0 ? '+' : ''}{blackEloDiff})
+                              </span>
+                            )}
+                          </p>
+                        </div>
+
+                        <div className="w-28 text-center">
+                          <a
+                            href={game.externalUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-xs text-primary hover:text-primary-light hover:underline font-medium"
+                          >
+                            <span>Lichess</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        </div>
                       </div>
                     </div>
                   );

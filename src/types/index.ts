@@ -75,6 +75,8 @@ export interface PreviewGame {
   mode: GameMode;
   whitePlayer: Profile;
   blackPlayer: Profile;
+  whiteLichessHandle?: string;
+  blackLichessHandle?: string;
   result: number;
   resultLabel: string;
   whiteEloOld: number;

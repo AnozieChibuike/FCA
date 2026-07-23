@@ -5,26 +5,26 @@ const titleEntries = Object.entries(TITLE_CONFIG).filter(([key]) => key !== 'NON
 
 export default function About() {
   return (
-    <div className="min-h-screen px-6 pt-28 pb-16">
+    <div className="min-h-screen px-4 sm:px-6 pt-22 sm:pt-28 pb-12 sm:pb-16">
       <div className="max-w-4xl mx-auto">
-        <div className="text-center mb-12">
-          <BookOpen className="w-10 h-10 text-primary mx-auto mb-4" />
-          <h1 className="font-heading text-3xl tracking-wider mb-3">About FCA</h1>
-          <p className="text-text-muted max-w-xl mx-auto">
+        <div className="text-center mb-8 sm:mb-12">
+          <BookOpen className="w-9 h-9 sm:w-10 sm:h-10 text-primary mx-auto mb-3 sm:mb-4" />
+          <h1 className="font-heading text-2xl sm:text-3xl tracking-wider mb-2 sm:mb-3">About FCA</h1>
+          <p className="text-text-muted text-xs sm:text-sm max-w-xl mx-auto">
             The FUTO Chess Association is dedicated to fostering chess excellence
             among students through structured competition and recognition.
           </p>
         </div>
 
-        <div className="glass-card p-8 mb-8">
-          <h2 className="font-heading text-xl tracking-wider mb-6 flex items-center gap-2">
+        <div className="glass-card p-5 sm:p-8 mb-6 sm:mb-8">
+          <h2 className="font-heading text-lg sm:text-xl tracking-wider mb-4 sm:mb-6 flex items-center gap-2">
             <Award className="w-5 h-5 text-yellow-400" />
             FCA Title Progression
           </h2>
-          <p className="text-text-muted text-sm mb-6">
+          <p className="text-text-muted text-xs sm:text-sm mb-4 sm:mb-6">
             Titles are awarded automatically based on peak Elo thresholds achieved in official FCA events.
           </p>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto no-scrollbar">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-primary/20">

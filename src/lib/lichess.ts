@@ -46,6 +46,7 @@ interface ProfileRow {
 
 export interface ArenaPreviewResult {
   games: PreviewGame[];
+  linkedUsernames: string[];
   unlinkedUsernames: string[];
   totalRawGames: number;
   alreadyImportedCount: number;
@@ -120,17 +121,21 @@ export async function fetchAndPreviewArena(
 
   const profileMap = new Map<string, ProfileRow>(
     profiles
-      .filter((p: ProfileRow) => p.lichess_username)
-      .map((p: ProfileRow) => [p.lichess_username!.toLowerCase(), p])
+      .filter((p: ProfileRow) => p.lichess_username && p.lichess_username.trim())
+      .map((p: ProfileRow) => [p.lichess_username!.trim().toLowerCase(), p])
   );
 
   const previewGames: PreviewGame[] = [];
+  const linkedSet = new Set<string>();
   const unlinkedSet = new Set<string>();
   let alreadyImportedCount = 0;
 
   for (const game of rawGames) {
-    const whiteHandle = game.players.white.user?.name?.toLowerCase();
-    const blackHandle = game.players.black.user?.name?.toLowerCase();
+    const rawWhiteName = game.players.white.user?.name;
+    const rawBlackName = game.players.black.user?.name;
+
+    const whiteHandle = rawWhiteName?.trim().toLowerCase();
+    const blackHandle = rawBlackName?.trim().toLowerCase();
 
     if (!whiteHandle || !blackHandle) continue;
 
@@ -138,10 +143,13 @@ export async function fetchAndPreviewArena(
     const blackProfile = profileMap.get(blackHandle);
 
     if (!whiteProfile || !blackProfile) {
-      if (!whiteProfile) unlinkedSet.add(whiteHandle);
-      if (!blackProfile) unlinkedSet.add(blackHandle);
+      if (!whiteProfile) unlinkedSet.add(rawWhiteName || whiteHandle);
+      if (!blackProfile) unlinkedSet.add(rawBlackName || blackHandle);
       continue;
     }
+
+    linkedSet.add(rawWhiteName || whiteProfile.lichess_username || whiteHandle);
+    linkedSet.add(rawBlackName || blackProfile.lichess_username || blackHandle);
 
     const gameId = game.id;
     const externalUrl = `https://lichess.org/${gameId}`;
@@ -181,6 +189,8 @@ export async function fetchAndPreviewArena(
       isAlreadyImported,
       whitePlayer: whiteProfile as unknown as PreviewGame['whitePlayer'],
       blackPlayer: blackProfile as unknown as PreviewGame['blackPlayer'],
+      whiteLichessHandle: rawWhiteName || whiteProfile.lichess_username || undefined,
+      blackLichessHandle: rawBlackName || blackProfile.lichess_username || undefined,
       result: scoreWhite,
       resultLabel,
       whiteEloOld: whiteStats.elo,
@@ -192,7 +202,8 @@ export async function fetchAndPreviewArena(
 
   return {
     games: previewGames,
-    unlinkedUsernames: Array.from(unlinkedSet),
+    linkedUsernames: Array.from(linkedSet).sort(),
+    unlinkedUsernames: Array.from(unlinkedSet).sort(),
     totalRawGames: rawGames.length,
     alreadyImportedCount,
   };

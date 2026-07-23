@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X, Swords, Shield, LogOut, User, CheckCircle, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../lib/auth';
+import { initiateLichessOAuth } from '../lib/lichessOAuth';
 import { getUserRole, ROLE_CONFIG } from '../types';
 import fcaLogo from '../assets/logo.png';
 
@@ -114,7 +115,8 @@ export default function Navbar() {
 
           <button
             onClick={() => setIsOpen(!isOpen)}
-            className="md:hidden p-2 text-text-muted hover:text-white transition-colors duration-150 cursor-pointer"
+            className="md:hidden min-w-[44px] min-h-[44px] p-2.5 text-text-muted hover:text-white hover:bg-[#2A2825]
+                       rounded-lg transition-colors duration-150 cursor-pointer flex items-center justify-center active:scale-95"
             aria-label="Toggle menu"
           >
             {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -122,17 +124,17 @@ export default function Navbar() {
         </div>
 
         {isOpen && (
-          <div className="md:hidden border-t border-chess-border py-3">
-            <div className="flex flex-col gap-1">
+          <div className="md:hidden border-t border-chess-border py-3 px-1">
+            <div className="flex flex-col gap-1.5">
               {navLinks.map((link) => (
                 <Link
                   key={link.path}
                   to={link.path}
                   onClick={() => setIsOpen(false)}
-                  className={`px-4 py-2.5 rounded-md text-sm font-semibold transition-colors duration-150 cursor-pointer
+                  className={`px-4 py-3 min-h-[44px] rounded-lg text-base font-semibold transition-colors duration-150 cursor-pointer flex items-center
                     ${location.pathname === link.path
                       ? 'bg-[#363431] text-white'
-                      : 'text-text-muted hover:text-white hover:bg-[#2A2825]'
+                      : 'text-text-muted hover:text-white hover:bg-[#2A2825] active:bg-[#363431]'
                     }`}
                 >
                   {link.label}
@@ -143,9 +145,9 @@ export default function Navbar() {
                 <Link
                   to="/admin"
                   onClick={() => setIsOpen(false)}
-                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-text-muted hover:text-white hover:bg-[#2A2825] rounded-md"
+                  className="flex items-center gap-3 px-4 py-3 min-h-[44px] text-base font-semibold text-text-muted hover:text-white hover:bg-[#2A2825] active:bg-[#363431] rounded-lg"
                 >
-                  <Swords className="w-4 h-4 text-primary" />
+                  <Swords className="w-5 h-5 text-primary" />
                   Arbiter Console
                 </Link>
               )}
@@ -154,9 +156,9 @@ export default function Navbar() {
                 <Link
                   to="/admin/dashboard"
                   onClick={() => setIsOpen(false)}
-                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-text-muted hover:text-white hover:bg-[#2A2825] rounded-md"
+                  className="flex items-center gap-3 px-4 py-3 min-h-[44px] text-base font-semibold text-text-muted hover:text-white hover:bg-[#2A2825] active:bg-[#363431] rounded-lg"
                 >
-                  <Shield className="w-4 h-4 text-primary" />
+                  <Shield className="w-5 h-5 text-primary" />
                   Admin Dashboard
                 </Link>
               )}
@@ -170,23 +172,23 @@ export default function Navbar() {
                       <Link
                         to={`/profile/${profile.id}`}
                         onClick={() => setIsOpen(false)}
-                        className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-text-muted hover:text-white hover:bg-[#2A2825] rounded-md"
+                        className="flex items-center gap-3 px-4 py-3 min-h-[44px] text-base font-semibold text-text-muted hover:text-white hover:bg-[#2A2825] active:bg-[#363431] rounded-lg"
                       >
                         {profile.avatar_url ? (
-                          <img src={profile.avatar_url} alt="" className="w-6 h-6 rounded-full object-cover" />
+                          <img src={profile.avatar_url} alt="" className="w-7 h-7 rounded-full object-cover border border-chess-border" />
                         ) : (
-                          <User className="w-4 h-4" />
+                          <User className="w-5 h-5" />
                         )}
-                        <span>{profile.full_name}</span>
-                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${roleConfig.bg} ${roleConfig.color}`}>
+                        <span className="text-white font-medium">{profile.full_name}</span>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${roleConfig.bg} ${roleConfig.color}`}>
                           {roleConfig.label}
                         </span>
                       </Link>
                       <button
                         onClick={handleLogout}
-                        className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-text-muted hover:text-white hover:bg-[#2A2825] rounded-md w-full text-left"
+                        className="flex items-center gap-3 px-4 py-3 min-h-[44px] text-base font-semibold text-text-muted hover:text-white hover:bg-[#2A2825] active:bg-[#363431] rounded-lg w-full text-left cursor-pointer"
                       >
-                        <LogOut className="w-4 h-4" />
+                        <LogOut className="w-5 h-5" />
                         Sign Out
                       </button>
                     </>
@@ -194,7 +196,7 @@ export default function Navbar() {
                     <Link
                       to="/login"
                       onClick={() => setIsOpen(false)}
-                      className="btn-primary text-sm text-center py-2.5 mt-1"
+                      className="btn-primary w-full text-base font-bold text-center py-3 min-h-[46px] mt-1"
                     >
                       Sign In
                     </Link>
@@ -205,6 +207,19 @@ export default function Navbar() {
           </div>
         )}
       </div>
+
+      {profile && !profile.lichess_username && (
+        <div className="bg-amber-950/90 border-t border-b border-amber-500/40 px-4 py-2 text-center text-xs text-amber-200 font-medium flex items-center justify-center gap-2 flex-wrap">
+          <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+          <span><strong>Action Required:</strong> Connect your official Lichess account via OAuth to qualify for FCA rated matches.</span>
+          <button
+            onClick={() => initiateLichessOAuth(`/profile/${profile.id}`)}
+            className="underline text-white font-bold hover:text-amber-300 ml-1 cursor-pointer"
+          >
+            Connect Lichess Now →
+          </button>
+        </div>
+      )}
     </nav>
   );
 }

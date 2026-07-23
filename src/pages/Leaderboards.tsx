@@ -92,19 +92,19 @@ export default function Leaderboards() {
       <div className="max-w-6xl mx-auto">
 
         {/* Header Area */}
-        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-5 mb-6 sm:mb-8">
           <div>
-            <h1 className="text-3xl md:text-4xl font-extrabold text-white mb-2">Global Rankings</h1>
-            <p className="text-text-muted text-sm">Real-time Elo tracking across all verified FCA formats.</p>
+            <h1 className="text-2xl sm:text-4xl font-extrabold text-white mb-1.5">Global Rankings</h1>
+            <p className="text-text-muted text-xs sm:text-sm">Real-time Elo tracking across all verified FCA formats.</p>
           </div>
 
           {/* Game Modes Segmented Selector */}
-          <div className="flex bg-[#161512] border border-chess-border p-1 rounded-lg w-fit overflow-x-auto">
+          <div className="flex bg-[#161512] border border-chess-border p-1 rounded-lg w-full sm:w-auto overflow-x-auto no-scrollbar">
             {MODES.map((m) => (
               <button
                 key={m}
                 onClick={() => setMode(m)}
-                className={`px-4 py-2 rounded-md text-xs font-bold transition-colors cursor-pointer whitespace-nowrap
+                className={`flex-1 sm:flex-initial px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-md text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap min-h-[40px] flex items-center justify-center select-none active:scale-95
                   ${mode === m
                     ? 'bg-primary text-white shadow-sm'
                     : 'text-text-muted hover:text-white hover:bg-[#262421]'
@@ -125,7 +125,7 @@ export default function Leaderboards() {
               placeholder="Search player by name..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-surface border border-chess-border rounded-md pl-10 pr-4 py-2.5 text-sm text-white
+              className="w-full bg-surface border border-chess-border rounded-md pl-10 pr-4 py-2.5 min-h-[44px] text-base sm:text-sm text-white
                          focus:outline-none focus:border-primary transition-colors placeholder:text-text-muted"
             />
           </div>
@@ -134,7 +134,7 @@ export default function Leaderboards() {
             <select
               value={departmentFilter}
               onChange={(e) => setDepartmentFilter(e.target.value)}
-              className="w-full bg-surface border border-chess-border rounded-md px-4 py-2.5 text-sm text-white
+              className="w-full bg-surface border border-chess-border rounded-md px-4 py-2.5 min-h-[44px] text-base sm:text-sm text-white
                          focus:outline-none focus:border-primary transition-colors cursor-pointer appearance-none"
             >
               <option value="">All Departments</option>
@@ -142,7 +142,7 @@ export default function Leaderboards() {
                 <option key={dept} value={dept}>{dept}</option>
               ))}
             </select>
-            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-text-muted">
+            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-text-muted text-xs">
               ▼
             </div>
           </div>
@@ -151,7 +151,7 @@ export default function Leaderboards() {
             <select
               value={facultyFilter}
               onChange={(e) => setFacultyFilter(e.target.value)}
-              className="w-full bg-surface border border-chess-border rounded-md px-4 py-2.5 text-sm text-white
+              className="w-full bg-surface border border-chess-border rounded-md px-4 py-2.5 min-h-[44px] text-base sm:text-sm text-white
                          focus:outline-none focus:border-primary transition-colors cursor-pointer appearance-none"
             >
               <option value="">All Faculties</option>
@@ -159,7 +159,7 @@ export default function Leaderboards() {
                 <option key={fac} value={fac}>{fac}</option>
               ))}
             </select>
-            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-text-muted">
+            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-text-muted text-xs">
               ▼
             </div>
           </div>
@@ -167,12 +167,12 @@ export default function Leaderboards() {
 
         {/* Table Container */}
         <div className="bg-surface border border-chess-border rounded-lg shadow-card overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm whitespace-nowrap">
+          <div className="overflow-x-auto no-scrollbar">
+            <table className="w-full text-left text-xs sm:text-sm whitespace-nowrap">
               <thead>
                 <tr className="bg-[#1E1C18] border-b border-chess-border text-text-muted text-xs uppercase tracking-wider font-semibold">
-                  <th className="p-4 w-16 text-center">Rank</th>
-                  <th className="p-4">Player</th>
+                  <th className="p-3 sm:p-4 w-12 sm:w-16 text-center">Rank</th>
+                  <th className="p-3 sm:p-4">Player</th>
                   <th className="p-4 text-center">Platforms</th>
                   <th className="p-4">Dept / Faculty</th>
                   <th className="p-4 text-center">Games</th>

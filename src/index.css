@@ -5,6 +5,9 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
   body {
     @apply bg-background text-text antialiased;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
@@ -27,23 +30,26 @@
   }
 
   .btn-primary {
-    @apply bg-primary hover:bg-primary-dark text-white font-bold px-6 py-3 rounded-md
-           shadow-btn transition-colors duration-150 cursor-pointer active:translate-y-0.5;
+    @apply bg-primary hover:bg-primary-dark text-white font-bold px-5 py-2.5 sm:px-6 sm:py-3 text-sm sm:text-base
+           rounded-md shadow-btn transition-all duration-150 cursor-pointer active:translate-y-0.5 active:scale-[0.98]
+           min-h-[44px] inline-flex items-center justify-center select-none;
   }
 
   .btn-cta {
-    @apply bg-primary hover:bg-primary-dark text-white font-bold px-6 py-3 rounded-md
-           shadow-btn transition-colors duration-150 cursor-pointer active:translate-y-0.5;
+    @apply bg-primary hover:bg-primary-dark text-white font-bold px-5 py-2.5 sm:px-6 sm:py-3 text-sm sm:text-base
+           rounded-md shadow-btn transition-all duration-150 cursor-pointer active:translate-y-0.5 active:scale-[0.98]
+           min-h-[44px] inline-flex items-center justify-center select-none;
   }
 
   .btn-secondary {
-    @apply bg-[#2A2825] hover:bg-[#363431] border border-[#363431] text-white font-semibold px-5 py-2.5 rounded-md
-           transition-colors duration-150 cursor-pointer;
+    @apply bg-[#2A2825] hover:bg-[#363431] border border-[#363431] text-white font-semibold px-4 py-2.5 sm:px-5 sm:py-2.5
+           text-sm rounded-md transition-all duration-150 cursor-pointer active:scale-[0.98]
+           min-h-[44px] inline-flex items-center justify-center select-none;
   }
 
   .input-field {
-    @apply w-full bg-[#161512] border border-[#363431] rounded-md px-4 py-3
-           text-white placeholder-text-muted focus:outline-none focus:border-primary
+    @apply w-full bg-[#161512] border border-[#363431] rounded-md px-3.5 py-2.5 sm:px-4 sm:py-3 min-h-[44px]
+           text-base sm:text-sm text-white placeholder-text-muted focus:outline-none focus:border-primary
            transition-colors duration-150;
   }
 
@@ -83,6 +89,13 @@
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
 }
 

@@ -1,12 +1,13 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import {
-  User, Edit3, Camera,
-  AlertTriangle, History,
+  User, Edit3, Camera, X, LogOut,
+  AlertTriangle, History, CheckCircle,
   Zap, Clock, Rocket, Landmark, TrendingUp, ExternalLink
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
+import { initiateLichessOAuth } from '../lib/lichessOAuth';
 import {
   TITLE_CONFIG, MODE_LABELS,
   type Profile as ProfileType, type GameMode, type Game
@@ -22,6 +23,19 @@ const MODE_ICONS: Record<GameMode, React.ReactNode> = {
   BULLET: <Rocket className="w-4 h-4 text-primary" />,
   CLASSICAL: <Landmark className="w-4 h-4 text-primary" />
 };
+
+function LichessIcon({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="-2 -2 54 54" xmlns="http://www.w3.org/2000/svg">
+      <path
+        fill="currentColor"
+        stroke="currentColor"
+        strokeJoin="round"
+        d="M38.956.5c-3.53.418-6.452.902-9.286 2.984C5.534 1.786-.692 18.533.68 29.364 3.493 50.214 31.918 55.785 41.329 41.7c-7.444 7.696-19.276 8.752-28.323 3.084C3.959 39.116-.506 27.392 4.683 17.567 9.873 7.742 18.996 4.535 29.03 6.405c2.43-1.418 5.225-3.22 7.655-3.187l-1.694 4.86 12.752 21.37c-.439 5.654-5.459 6.112-5.459 6.112-.574-1.47-1.634-2.942-4.842-6.036-3.207-3.094-17.465-10.177-15.788-16.207-2.001 6.967 10.311 14.152 14.04 17.663 3.73 3.51 5.426 6.04 5.795 6.756 0 0 9.392-2.504 7.838-8.927L37.4 7.171z"
+      />
+    </svg>
+  );
+}
 
 export default function Profile() {
   const { id } = useParams<{ id: string }>();
@@ -42,9 +56,32 @@ export default function Profile() {
     faculty: '',
   });
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const [showLichessModal, setShowLichessModal] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isOwnProfile = authProfile?.id === id;
+
+  async function handleDisconnectLichess() {
+    if (!player || !isOwnProfile) return;
+    setDisconnecting(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ lichess_username: null })
+        .eq('id', player.id);
+
+      if (error) throw error;
+
+      setPlayer({ ...player, lichess_username: null });
+      setShowLichessModal(false);
+      await refreshProfile();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to disconnect account.');
+    } finally {
+      setDisconnecting(false);
+    }
+  }
 
   useEffect(() => {
     async function fetchProfile() {
@@ -121,7 +158,6 @@ export default function Profile() {
 
     setAvatarUploading(true);
     try {
-      // 1. Delete former avatar files in Supabase storage for this user
       const { data: existingFiles } = await supabase.storage
         .from('avatars')
         .list(player.id);
@@ -131,7 +167,6 @@ export default function Profile() {
         await supabase.storage.from('avatars').remove(filesToRemove);
       }
 
-      // 2. Upload new avatar image
       const fileExt = file.name.split('.').pop() || 'png';
       const fileName = `${player.id}/avatar-${Date.now()}.${fileExt}`;
 
@@ -141,11 +176,9 @@ export default function Profile() {
 
       if (uploadError) throw uploadError;
 
-      // 3. Get public URL with timestamp cache buster
       const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(fileName);
       const publicUrl = `${urlData.publicUrl}?t=${Date.now()}`;
 
-      // 4. Update profile in database
       await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', player.id);
       const { data } = await supabase.from('profiles').select('*').eq('id', player.id).maybeSingle();
       setPlayer(data);
@@ -181,11 +214,9 @@ export default function Profile() {
   const titleConfig = TITLE_CONFIG[activeTitleKey];
 
   return (
-    <div className="min-h-screen px-4 md:px-6 pt-24 pb-16">
-      <div className="max-w-5xl mx-auto">
-
+    <div className="min-h-screen px-4 sm:px-6 pt-28 sm:pt-32 pb-12 sm:pb-16 max-w-5xl mx-auto">
         {/* Profile Card Header */}
-        <div className="bg-surface border border-chess-border p-6 md:p-8 rounded-lg shadow-card mb-8 flex flex-col md:flex-row items-center md:items-start gap-6">
+        <div className="bg-surface border border-chess-border p-5 sm:p-8 rounded-lg shadow-card mb-6 sm:mb-8 flex flex-col md:flex-row items-center md:items-start gap-6">
           {/* Avatar Container */}
           <div className="relative group flex-shrink-0">
             <div className="w-28 h-28 md:w-32 md:h-32 rounded-full overflow-hidden bg-[#161512] border-2 border-chess-border flex items-center justify-center relative cursor-pointer"
@@ -223,13 +254,13 @@ export default function Profile() {
                 <input
                   value={editForm.full_name}
                   onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
-                  className="input-field text-2xl font-bold mb-2"
+                  className="input-field text-xl sm:text-2xl font-bold mb-2"
                 />
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <select
                     value={editForm.faculty}
                     onChange={(e) => setEditForm({ ...editForm, faculty: e.target.value, department: '' })}
-                    className="input-field text-xs w-1/2 cursor-pointer appearance-none"
+                    className="input-field text-xs w-full sm:w-1/2 cursor-pointer appearance-none"
                   >
                     <option value="">Select School/Faculty...</option>
                     {FUTO_FACULTIES.map((fac) => (
@@ -239,7 +270,7 @@ export default function Profile() {
                   <select
                     value={editForm.department}
                     onChange={(e) => setEditForm({ ...editForm, department: e.target.value })}
-                    className="input-field text-xs w-1/2 cursor-pointer appearance-none"
+                    className="input-field text-xs w-full sm:w-1/2 cursor-pointer appearance-none"
                     disabled={!editForm.faculty}
                   >
                     <option value="">{editForm.faculty ? 'Select Department...' : 'First Select Faculty...'}</option>
@@ -250,51 +281,78 @@ export default function Profile() {
                 </div>
               </div>
             ) : (
-              <>
-                <div className="flex flex-col md:flex-row items-center gap-3 mb-1">
-                  <h1 className="text-3xl md:text-4xl font-extrabold text-white">{player.full_name}</h1>
-                  {player.status === 'PENDING' && (
-                    <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-red-950/60 text-red-400 border border-red-800 text-xs font-semibold">
-                      <AlertTriangle className="w-3.5 h-3.5" /> Unverified
-                    </span>
-                  )}
-                </div>
-                <p className="text-text-muted text-sm mb-5">
-                  {player.department} &bull; {player.faculty}
+              <div>
+                <h1 className="font-extrabold text-2xl sm:text-3xl text-white mb-1 flex items-center justify-center md:justify-start gap-2">
+                  {player.full_name}
+                </h1>
+                <p className="text-text-muted text-xs sm:text-sm mb-3">
+                  {player.department} · {player.faculty}
                 </p>
-              </>
+              </div>
             )}
 
-            {/* Platform Accounts */}
-            <div className="flex flex-wrap items-center justify-center md:justify-start gap-2.5">
+            {player.bio && !editing && (
+              <p className="text-text-muted text-xs sm:text-sm leading-relaxed mb-4 max-w-2xl">{player.bio}</p>
+            )}
+
+            {/* Chess Handles */}
+            <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 text-xs">
               {editing ? (
-                <div className="flex gap-2 w-full max-w-md">
+                <div className="w-full space-y-2">
                   <input
-                    value={editForm.lichess_username}
-                    onChange={(e) => setEditForm({ ...editForm, lichess_username: e.target.value })}
-                    className="input-field text-xs flex-1"
-                    placeholder="Lichess Username"
+                    value={editForm.bio}
+                    onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })}
+                    placeholder="Short bio..."
+                    className="input-field text-xs"
                   />
-                  <input
-                    value={editForm.chesscom_username}
-                    onChange={(e) => setEditForm({ ...editForm, chesscom_username: e.target.value })}
-                    className="input-field text-xs flex-1"
-                    placeholder="Chess.com Username"
-                  />
+                  <div className="p-3 rounded bg-[#161512] border border-chess-border text-xs">
+                    <p className="text-text-muted mb-1 font-semibold">Lichess Verification</p>
+                    <p className="text-emerald-400 font-mono mb-2">
+                      {player.lichess_username ? `@${player.lichess_username} (Verified via OAuth)` : 'No Lichess Account Connected'}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => initiateLichessOAuth(`/profile/${player.id}`)}
+                      className="btn-secondary py-1.5 px-3 text-xs font-bold inline-flex items-center gap-1.5"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      {player.lichess_username ? 'Reconnect Lichess via OAuth' : 'Connect Lichess via OAuth'}
+                    </button>
+                  </div>
                 </div>
               ) : (
-                <>
-                  {player.lichess_username && (
-                    <a href={`https://lichess.org/@/${player.lichess_username}`} target="_blank" rel="noreferrer"
-                      className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-[#161512] border border-chess-border hover:border-primary/50 transition-colors text-xs">
-                      <svg viewBox='-2 -2 54 54' xmlns='http://www.w3.org/2000/svg' className="w-4 h-4 text-white"><path fill='currentColor' stroke='currentColor' strokeLinejoin='round' d='M38.956.5c-3.53.418-6.452.902-9.286 2.984C5.534 1.786-.692 18.533.68 29.364 3.493 50.214 31.918 55.785 41.329 41.7c-7.444 7.696-19.276 8.752-28.323 3.084C3.959 39.116-.506 27.392 4.683 17.567 9.873 7.742 18.996 4.535 29.03 6.405c2.43-1.418 5.225-3.22 7.655-3.187l-1.694 4.86 12.752 21.37c-.439 5.654-5.459 6.112-5.459 6.112-.574-1.47-1.634-2.942-4.842-6.036-3.207-3.094-17.465-10.177-15.788-16.207-2.001 6.967 10.311 14.152 14.04 17.663 3.73 3.51 5.426 6.04 5.795 6.756 0 0 9.392-2.504 7.838-8.927L37.4 7.171z' /></svg>
-                      <span className="text-text-muted">Lichess:</span>
-                      <span className="text-white font-medium">{player.lichess_username}</span>
-                    </a>
+                <div className="flex flex-wrap items-center gap-3">
+                  {player.lichess_username ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowLichessModal(true)}
+                      className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-[#161512] border border-chess-border text-white text-xs font-semibold shadow-sm hover:border-primary/60 transition-all cursor-pointer active:scale-95"
+                      title="Click to view details or disconnect"
+                    >
+                      <LichessIcon className="w-4 h-4 text-white flex-shrink-0" />
+                      <span>@{player.lichess_username}</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => isOwnProfile && initiateLichessOAuth(`/profile/${player.id}`)}
+                      className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-[#161512] border border-chess-border text-xs font-semibold transition-all shadow-sm ${
+                        isOwnProfile ? 'hover:border-primary/60 hover:text-white cursor-pointer active:scale-95' : 'cursor-default'
+                      }`}
+                    >
+                      <LichessIcon className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                      <span className="text-text-muted">
+                        Lichess: <span className="text-amber-400 font-bold">Not Connected</span>
+                      </span>
+                    </button>
                   )}
                   {player.chesscom_username && (
-                    <a href={`https://chess.com/member/${player.chesscom_username}`} target="_blank" rel="noreferrer"
-                      className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-[#161512] border border-chess-border hover:border-primary/50 transition-colors text-xs">
+                    <a
+                      href={`https://chess.com/member/${player.chesscom_username}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-[#161512] border border-chess-border hover:border-primary/50 transition-colors"
+                    >
                       <svg viewBox="0 0 45 45" xmlns="http://www.w3.org/2000/svg" baseProfile="tiny-ps" version="1.2" className="w-4 h-4">
                         <g transform="translate(7.136 -.188)">
                           <clipPath id="prof_a"><path transform="matrix(1 0 0 -1 0 45)" d="M25.773 12.567c-7.338 5.595-6.523 10.45-6.616 12.447h4.474c.523.971.788 1.871.788 2.993l-5.072 3.341a7.011 7.011 0 0 1 2.912 5.691 7.029 7.029 0 0 1-4.393 6.517c-.814.33-6.56-18.542-6.56-18.542a41.217 41.217 0 0 1-.023-1.679c0-1.874 4.607-1.59 4.362-3.247-.368-2.476-.445-4.356-2.577-10.306-1.44-4.015-11.035 0-11.72-1.97C.87 6.44.616 4.901.616 3.245c0-.177.386-2.833 14.617-2.833 14.23 0 14.614 2.656 14.614 2.833 0 4.036-1.507 7.363-4.075 9.321" fillRule="evenodd" /></clipPath>
@@ -311,7 +369,7 @@ export default function Profile() {
                       <span className="text-white font-medium">{player.chesscom_username}</span>
                     </a>
                   )}
-                </>
+                </div>
               )}
             </div>
 
@@ -440,7 +498,50 @@ export default function Profile() {
           </div>
         </div>
 
+        {/* Lichess Account Interactive Popup Modal */}
+        {showLichessModal && player && player.lichess_username && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
+            <div className="glass-card p-6 max-w-sm w-full border border-chess-border text-center shadow-2xl relative">
+              <button
+                onClick={() => setShowLichessModal(false)}
+                className="absolute top-3 right-3 text-text-muted hover:text-white p-1 rounded-md cursor-pointer transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="w-14 h-14 rounded-full bg-[#161512] border border-chess-border flex items-center justify-center mx-auto mb-3 shadow-lg">
+                <LichessIcon className="w-7 h-7 text-white" />
+              </div>
+
+              <h3 className="font-heading text-lg text-white mb-0.5">Lichess Account</h3>
+              <p className="text-white font-mono text-base font-bold mb-5">@{player.lichess_username}</p>
+
+              <div className="space-y-2.5">
+                <a
+                  href={`https://lichess.org/@/${player.lichess_username}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={() => setShowLichessModal(false)}
+                  className="w-full btn-primary py-3 text-xs font-bold flex items-center justify-center gap-2"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  View Profile on Lichess.org
+                </a>
+
+                {isOwnProfile && (
+                  <button
+                    onClick={handleDisconnectLichess}
+                    disabled={disconnecting}
+                    className="w-full py-2.5 px-4 rounded-lg bg-red-950/80 border border-red-600/50 text-red-300 text-xs font-bold hover:bg-red-900 transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    {disconnecting ? 'Disconnecting...' : 'Disconnect Lichess Account'}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
-    </div>
-  );
-}
+    );
+  }

@@ -5,25 +5,25 @@ export default function Memorial() {
   const eternalConfig = TITLE_CONFIG.FET;
 
   return (
-    <div className="min-h-screen px-6 pt-28 pb-16">
+    <div className="min-h-screen px-4 sm:px-6 pt-22 sm:pt-28 pb-12 sm:pb-16">
       <div className="max-w-3xl mx-auto">
-        <div className="text-center mb-12">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-400 text-sm mb-6">
+        <div className="text-center mb-8 sm:mb-12">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs sm:text-sm mb-4 sm:mb-6 select-none">
             <Star className="w-4 h-4" />
             In Memoriam
           </div>
-          <h1 className="font-extrabold text-4xl md:text-5xl tracking-wide mb-4">
+          <h1 className="font-extrabold text-3xl sm:text-5xl tracking-wide mb-3 sm:mb-4">
             <span className="text-purple-400 font-extrabold">Chisom Howell</span>
           </h1>
           <div className="flex items-center justify-center gap-3 mb-6">
-            <span className="fet-shimmer-badge px-1.5 py-0.5 rounded title-badge mr-1.5 font-bold">FET</span>
-            <span className="text-text-muted text-sm">{eternalConfig.label}</span>
+            <span className="fet-shimmer-badge px-2 py-0.5 rounded title-badge mr-1.5 font-bold">FET</span>
+            <span className="text-text-muted text-xs sm:text-sm">{eternalConfig.label}</span>
           </div>
         </div>
 
-        <div className="glass-card p-8 border-l-4 border-l-purple-500 mb-8">
-          <Quote className="w-8 h-8 text-purple-400/50 mb-4" />
-          <p className="text-text text-lg leading-relaxed italic">
+        <div className="glass-card p-5 sm:p-8 border-l-4 border-l-purple-500 mb-6 sm:mb-8">
+          <Quote className="w-6 h-6 sm:w-8 sm:h-8 text-purple-400/50 mb-3 sm:mb-4" />
+          <p className="text-text text-base sm:text-lg leading-relaxed italic">
             "In every game played, in every move considered, the spirit of Chisom Howell lives on.
             His passion for chess and dedication to the FUTO Chess Association will forever be
             remembered and celebrated."

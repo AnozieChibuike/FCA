@@ -13,6 +13,7 @@ import AdminConsole from './pages/AdminConsole';
 import AdminDashboard from './pages/AdminDashboard';
 import InviteLinks from './pages/InviteLinks';
 import About from './pages/About';
+import LichessCallback from './pages/LichessCallback';
 import NotFound from './pages/NotFound';
 
 function ProfileRedirect() {
@@ -48,6 +49,7 @@ export default function App() {
               <Route path="/admin/dashboard" element={<AdminDashboard />} />
               <Route path="/admin/invites" element={<InviteLinks />} />
               <Route path="/about" element={<About />} />
+              <Route path="/auth/lichess/callback" element={<LichessCallback />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </main>
