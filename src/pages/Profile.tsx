@@ -14,6 +14,7 @@ import {
 import PlayerStats from '../components/PlayerStats';
 import { FUTO_FACULTIES } from '../data/futoData';
 import { extractLichessGameId } from '../lib/lichess';
+import ChesscomVerifyModal, { ChesscomIcon } from '../components/ChesscomVerifyModal';
 
 const MODES: GameMode[] = ['BLITZ', 'RAPID', 'BULLET', 'CLASSICAL'];
 const MODE_ICONS: Record<GameMode, React.ReactNode> = {
@@ -57,9 +58,46 @@ export default function Profile() {
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [showLichessModal, setShowLichessModal] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
+  const [showChesscomVerifyModal, setShowChesscomVerifyModal] = useState(false);
+  const [showChesscomDetailModal, setShowChesscomDetailModal] = useState(false);
+  const [disconnectingChesscom, setDisconnectingChesscom] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isOwnProfile = authProfile?.id === id;
+
+  async function handleDisconnectChesscom() {
+    if (!player || !isOwnProfile) return;
+    setDisconnectingChesscom(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ chesscom_username: null })
+        .eq('id', player.id);
+
+      if (error) throw error;
+
+      setPlayer({ ...player, chesscom_username: null });
+      setShowChesscomDetailModal(false);
+      await refreshProfile();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to disconnect Chess.com account.');
+    } finally {
+      setDisconnectingChesscom(false);
+    }
+  }
+
+  async function handleChesscomSuccess(username: string) {
+    if (!player || !isOwnProfile) return;
+    const { error } = await supabase
+      .from('profiles')
+      .update({ chesscom_username: username })
+      .eq('id', player.id);
+
+    if (!error) {
+      setPlayer({ ...player, chesscom_username: username });
+      await refreshProfile();
+    }
+  }
 
   async function handleDisconnectLichess() {
     if (!player || !isOwnProfile) return;
@@ -345,28 +383,29 @@ export default function Profile() {
                       </span>
                     </button>
                   )}
-                  {player.chesscom_username && (
-                    <a
-                      href={`https://chess.com/member/${player.chesscom_username}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-[#161512] border border-chess-border hover:border-primary/50 transition-colors"
+                  {player.chesscom_username ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowChesscomDetailModal(true)}
+                      className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-[#161512] border border-chess-border text-white text-xs font-semibold shadow-sm hover:border-primary/60 transition-all cursor-pointer active:scale-95"
+                      title="Click to view details or disconnect"
                     >
-                      <svg viewBox="0 0 45 45" xmlns="http://www.w3.org/2000/svg" baseProfile="tiny-ps" version="1.2" className="w-4 h-4">
-                        <g transform="translate(7.136 -.188)">
-                          <clipPath id="prof_a"><path transform="matrix(1 0 0 -1 0 45)" d="M25.773 12.567c-7.338 5.595-6.523 10.45-6.616 12.447h4.474c.523.971.788 1.871.788 2.993l-5.072 3.341a7.011 7.011 0 0 1 2.912 5.691 7.029 7.029 0 0 1-4.393 6.517c-.814.33-6.56-18.542-6.56-18.542a41.217 41.217 0 0 1-.023-1.679c0-1.874 4.607-1.59 4.362-3.247-.368-2.476-.445-4.356-2.577-10.306-1.44-4.015-11.035 0-11.72-1.97C.87 6.44.616 4.901.616 3.245c0-.177.386-2.833 14.617-2.833 14.23 0 14.614 2.656 14.614 2.833 0 4.036-1.507 7.363-4.075 9.321" fillRule="evenodd" /></clipPath>
-                          <g clipPath="url(#prof_a)"><path d="M -4.383 -3.56 L 34.847 -3.56 L 34.847 49.587 L -4.383 49.587 L -4.383 -3.56 Z" fill="#5D9948" /></g>
-                          <clipPath id="prof_c"><path transform="matrix(1 0 0 -1 0 45)" d="M14.974 10.057c.79 3.6 1.493 7.437 1.92 9.734.532 2.868-3.821 3.38-5.608 3.644-.082-2.448-.765-6.424-6.593-10.867-1.572-1.2-2.743-2.91-3.418-4.982C2.848 6.819 4.949 6.36 8.184 6.36c2.077 0 5.923-.25 6.79 3.696" fillRule="evenodd" /></clipPath>
-                          <g clipPath="url(#prof_c)"><path d="M -3.725 16.565 L 21.938 16.565 L 21.938 43.643 L -3.725 43.643 L -3.725 16.565 Z" fill="#81B64C" /></g>
-                          <clipPath id="prof_e"><path transform="matrix(1 0 0 -1 0 45)" d="M18.03 25.014c.688 1.79.6 2.993.6 2.993l-2.873 3.341c3.054 1.304 4.893 3.755 4.893 6.61a7.013 7.013 0 0 1-2.766 5.59 7.027 7.027 0 0 1-9.679-6.508 7.014 7.014 0 0 1 2.912-5.692l-5.072-3.34c0-1.122.265-2.022.79-2.994H18.03Z" fillRule="evenodd" /></clipPath>
-                          <g clipPath="url(#prof_e)"><path d="M 1.045 -4.066 L 25.65 -4.066 L 25.65 24.986 L 1.045 24.986 L 1.045 -4.066 Z" fill="#81B64C" /></g>
-                          <clipPath id="prof_g"><path transform="matrix(1 0 0 -1 0 45)" d="M14.828 42.633c4.053-.629-1.863-5.33-3.73-5.108-1.777.21-.069 5.7 3.73 5.108" fillRule="evenodd" /></clipPath>
-                          <g clipPath="url(#prof_g)"><path d="M 5.393 -2.678 L 21.218 -2.678 L 21.218 12.482 L 5.393 12.482 L 5.393 -2.678 Z" fill="#B2E068" /></g>
-                        </g>
-                      </svg>
-                      <span className="text-text-muted">Chess.com:</span>
-                      <span className="text-white font-medium">{player.chesscom_username}</span>
-                    </a>
+                      <ChesscomIcon className="w-4 h-4 flex-shrink-0" />
+                      <span>@{player.chesscom_username}</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => isOwnProfile && setShowChesscomVerifyModal(true)}
+                      className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-[#161512] border border-chess-border text-xs font-semibold transition-all shadow-sm ${
+                        isOwnProfile ? 'hover:border-primary/60 hover:text-white cursor-pointer active:scale-95' : 'cursor-default'
+                      }`}
+                    >
+                      <ChesscomIcon className="w-4 h-4 opacity-50 flex-shrink-0" />
+                      <span className="text-text-muted">
+                        Chess.com: <span className="text-amber-400 font-bold">Not Connected</span>
+                      </span>
+                    </button>
                   )}
                 </div>
               )}
@@ -541,6 +580,59 @@ export default function Profile() {
             </div>
           </div>
         )}
+
+        {/* Chess.com Account Interactive Popup Modal */}
+        {showChesscomDetailModal && player && player.chesscom_username && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
+            <div className="glass-card p-6 max-w-sm w-full border border-chess-border text-center shadow-2xl relative">
+              <button
+                onClick={() => setShowChesscomDetailModal(false)}
+                className="absolute top-3 right-3 text-text-muted hover:text-white p-1 rounded-md cursor-pointer transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="w-14 h-14 rounded-full bg-[#161512] border border-chess-border flex items-center justify-center mx-auto mb-3 shadow-lg">
+                <ChesscomIcon className="w-7 h-7" />
+              </div>
+
+              <h3 className="font-heading text-lg text-white mb-0.5">Chess.com Account</h3>
+              <p className="text-white font-mono text-base font-bold mb-5">@{player.chesscom_username}</p>
+
+              <div className="space-y-2.5">
+                <a
+                  href={`https://chess.com/member/${player.chesscom_username}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={() => setShowChesscomDetailModal(false)}
+                  className="w-full btn-primary py-3 text-xs font-bold flex items-center justify-center gap-2"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  View Profile on Chess.com
+                </a>
+
+                {isOwnProfile && (
+                  <button
+                    onClick={handleDisconnectChesscom}
+                    disabled={disconnectingChesscom}
+                    className="w-full py-2.5 px-4 rounded-lg bg-red-950/80 border border-red-600/50 text-red-300 text-xs font-bold hover:bg-red-900 transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    {disconnectingChesscom ? 'Disconnecting...' : 'Disconnect Chess.com Account'}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Chess.com Account Verification Modal */}
+        <ChesscomVerifyModal
+          isOpen={showChesscomVerifyModal}
+          onClose={() => setShowChesscomVerifyModal(false)}
+          onSuccess={handleChesscomSuccess}
+          initialUsername={player?.chesscom_username}
+        />
       </div>
     );
   }

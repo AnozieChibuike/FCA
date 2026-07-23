@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { initiateLichessOAuth } from '../lib/lichessOAuth';
+import ChesscomVerifyModal from '../components/ChesscomVerifyModal';
 
 const detailsSchema = z.object({
   fullName: z.string().min(2, 'Name must be at least 2 characters'),
@@ -37,6 +38,10 @@ export default function JoinFCA() {
   const [pendingLichess] = useState<string | null>(() => {
     return sessionStorage.getItem('fca_pending_lichess_username');
   });
+  const [pendingChesscom, setPendingChesscom] = useState<string | null>(() => {
+    return sessionStorage.getItem('fca_pending_chesscom_username');
+  });
+  const [showChesscomModal, setShowChesscomModal] = useState(false);
   const { signUp } = useAuth();
   const navigate = useNavigate();
 
@@ -67,6 +72,7 @@ export default function JoinFCA() {
       faculty: details.faculty,
       phone: details.phone || null,
       lichess_username: pendingLichess || null,
+      chesscom_username: pendingChesscom || null,
       fca_id: fcaId,
       status: 'PENDING',
     });
@@ -78,6 +84,7 @@ export default function JoinFCA() {
     }
 
     sessionStorage.removeItem('fca_pending_lichess_username');
+    sessionStorage.removeItem('fca_pending_chesscom_username');
 
     setLoading(false);
     navigate('/profile');
@@ -224,6 +231,45 @@ export default function JoinFCA() {
               )}
             </div>
 
+            <div className="border-t border-primary/20 pt-4 sm:pt-5">
+              <label className="block text-xs sm:text-sm font-semibold text-text mb-2">
+                Connect Chess.com Account (Optional Verification)
+              </label>
+              
+              {pendingChesscom ? (
+                <div className="p-3.5 rounded-lg bg-emerald-950/80 border border-emerald-500/40 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+                    <div>
+                      <p className="text-xs text-emerald-300 font-semibold">Chess.com Account Verified</p>
+                      <p className="text-sm font-bold text-white font-mono">@{pendingChesscom}</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowChesscomModal(true)}
+                    className="text-xs text-emerald-400 hover:underline font-medium cursor-pointer"
+                  >
+                    Change Account
+                  </button>
+                </div>
+              ) : (
+                <div className="p-4 rounded-lg bg-[#161512] border border-chess-border text-center">
+                  <p className="text-xs text-text-muted mb-3">
+                    Verify ownership of your Chess.com handle with a 1-click lookup or verification code.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowChesscomModal(true)}
+                    className="btn-primary py-2.5 px-5 text-xs sm:text-sm font-bold inline-flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    Connect Chess.com Account
+                  </button>
+                </div>
+              )}
+            </div>
+
             <button type="submit" className="w-full btn-primary min-h-[46px] flex items-center justify-center gap-2 text-sm sm:text-base font-bold mt-2">
               Continue <ArrowRight className="w-4 h-4" />
             </button>
@@ -321,6 +367,16 @@ export default function JoinFCA() {
             Already have an account? Sign in
           </Link>
         </div>
+
+        <ChesscomVerifyModal
+          isOpen={showChesscomModal}
+          onClose={() => setShowChesscomModal(false)}
+          onSuccess={async (username) => {
+            sessionStorage.setItem('fca_pending_chesscom_username', username);
+            setPendingChesscom(username);
+          }}
+          initialUsername={pendingChesscom}
+        />
       </div>
     </div>
   );
