@@ -39,7 +39,7 @@ export interface LichessOAuthResult {
  */
 export async function handleLichessOAuthCallback(
   code?: string,
-  state?: string
+  _state?: string
 ): Promise<LichessOAuthResult> {
   const returnPath = sessionStorage.getItem('fca_lichess_oauth_return') || '/profile';
 
