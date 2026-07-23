@@ -5,7 +5,7 @@ const titleEntries = Object.entries(TITLE_CONFIG).filter(([key]) => key !== 'NON
 
 export default function About() {
   return (
-    <div className="min-h-screen px-4 sm:px-6 pt-22 sm:pt-28 pb-12 sm:pb-16">
+    <div className="min-h-screen px-4 sm:px-6 pt-24 sm:pt-28 pb-12 sm:pb-16">
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-8 sm:mb-12">
           <BookOpen className="w-9 h-9 sm:w-10 sm:h-10 text-primary mx-auto mb-3 sm:mb-4" />

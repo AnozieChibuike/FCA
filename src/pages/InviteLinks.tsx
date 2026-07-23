@@ -91,7 +91,7 @@ export default function InviteLinks() {
   }
 
   return (
-    <div className="min-h-screen px-6 pt-28 pb-16">
+    <div className="min-h-screen px-4 sm:px-6 pt-24 sm:pt-28 pb-12 sm:pb-16">
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-10">
           <Link2 className="w-10 h-10 text-primary mx-auto mb-4" />

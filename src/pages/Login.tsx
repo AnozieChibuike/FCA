@@ -94,7 +94,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 pt-22 sm:pt-28 pb-12">
+    <div className="min-h-screen flex items-center justify-center px-4 pt-24 sm:pt-28 pb-12">
       <div className="bg-surface border border-chess-border p-5 sm:p-8 rounded-lg shadow-card w-full max-w-md">
         <div className="text-center mb-6">
           <img src={fcaLogo} alt="FCA Logo" className="w-12 h-12 object-contain mx-auto mb-3" />

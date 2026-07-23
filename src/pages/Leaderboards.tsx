@@ -88,7 +88,7 @@ export default function Leaderboards() {
   };
 
   return (
-    <div className="min-h-screen px-4 md:px-6 pt-24 pb-16">
+    <div className="min-h-screen px-4 sm:px-6 pt-24 sm:pt-28 pb-12 sm:pb-16">
       <div className="max-w-6xl mx-auto">
 
         {/* Header Area */}

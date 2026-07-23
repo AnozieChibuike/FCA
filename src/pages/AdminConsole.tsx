@@ -305,7 +305,7 @@ export default function AdminConsole() {
   const playableGamesCount = previewGames.filter(g => !g.isAlreadyImported).length;
 
   return (
-    <div className="min-h-screen px-4 sm:px-6 pt-22 sm:pt-28 pb-12 sm:pb-16">
+    <div className="min-h-screen px-4 sm:px-6 pt-24 sm:pt-28 pb-12 sm:pb-16">
       <div className="max-w-5xl mx-auto">
         <div className="text-center mb-6 sm:mb-8">
           <Swords className="w-9 h-9 sm:w-10 sm:h-10 text-cta mx-auto mb-3 sm:mb-4" />

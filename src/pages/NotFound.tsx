@@ -4,7 +4,7 @@ import fcaLogo from '../assets/logo.png';
 
 export default function NotFound() {
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 pt-28 pb-16">
+    <div className="min-h-screen flex items-center justify-center px-4 pt-24 sm:pt-28 pb-16">
       <div className="max-w-xl w-full text-center">
         {/* Animated Badge & Logo */}
         <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#262421] border border-chess-border text-white text-xs font-semibold mb-6 shadow-sm">

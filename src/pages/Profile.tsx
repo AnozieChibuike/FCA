@@ -251,7 +251,7 @@ export default function Profile() {
   const titleConfig = TITLE_CONFIG[activeTitleKey];
 
   return (
-    <div className="min-h-screen px-4 sm:px-6 pt-28 sm:pt-32 pb-12 sm:pb-16 max-w-5xl mx-auto">
+    <div className="min-h-screen px-4 sm:px-6 pt-24 sm:pt-28 pb-12 sm:pb-16 max-w-5xl mx-auto">
         {/* Profile Card Header */}
         <div className="bg-surface border border-chess-border p-5 sm:p-8 rounded-lg shadow-card mb-6 sm:mb-8 flex flex-col md:flex-row items-center md:items-start gap-6">
           {/* Avatar Container */}

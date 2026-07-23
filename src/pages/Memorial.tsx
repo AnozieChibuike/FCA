@@ -5,7 +5,7 @@ export default function Memorial() {
   const eternalConfig = TITLE_CONFIG.FET;
 
   return (
-    <div className="min-h-screen px-4 sm:px-6 pt-22 sm:pt-28 pb-12 sm:pb-16">
+    <div className="min-h-screen px-4 sm:px-6 pt-24 sm:pt-28 pb-12 sm:pb-16">
       <div className="max-w-3xl mx-auto">
         <div className="text-center mb-8 sm:mb-12">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs sm:text-sm mb-4 sm:mb-6 select-none">

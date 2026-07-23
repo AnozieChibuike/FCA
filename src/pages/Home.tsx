@@ -34,7 +34,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen">
-      <section className="pt-22 sm:pt-28 pb-12 sm:pb-16 px-4 sm:px-6">
+      <section className="pt-24 sm:pt-28 pb-12 sm:pb-16 px-4 sm:px-6">
         <div className="max-w-6xl mx-auto">
           {/* Main Hero Header */}
           <div className="text-center mb-8 sm:mb-12">

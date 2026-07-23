@@ -78,7 +78,7 @@ export default function LichessCallback() {
   }, []);
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 pt-24 pb-12">
+    <div className="min-h-screen flex items-center justify-center px-4 pt-24 sm:pt-28 pb-12">
       <div className="glass-card p-8 rounded-lg shadow-card w-full max-w-md text-center">
         {status === 'loading' && (
           <div>
