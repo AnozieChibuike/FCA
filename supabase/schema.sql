@@ -165,13 +165,13 @@ CREATE TRIGGER on_auth_user_created
 -- 5. Seed Chisom Howell Immortal Profile
 INSERT INTO profiles (
     id, fca_id, full_name, reg_number, department, faculty,
-    lichess_username, blitz_elo, rapid_elo, bullet_elo, classical_elo,
+    lichess_username, avatar_url, blitz_elo, rapid_elo, bullet_elo, classical_elo,
     earned_title, is_immortal, status, bio
 ) VALUES (
     uuid_generate_v4(), 'FCA-ETERNAL', 'Chisom Howell', 'HONORARY',
-    'FUTO Chess Association', 'FUTO', 'chisom_howell',
+    'Software Engineering', 'SICT', 'strengthofLSB', '/chisom-howell.jpg',
     2500, 2500, 2500, 2500, 'FET', TRUE, 'APPROVED',
-    'The eternal founder of FCA. Forever in our hearts.'
+    'A notable and remarkably skilled chess player in FCA history. Remembered for his sharp tactical mind, competitive drive, and passion for chess. Forever in our hearts.'
 );
 
 -- 6. Games Table

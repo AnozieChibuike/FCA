@@ -13,12 +13,14 @@ async function main() {
         password: 'Sweetest2005@',
         options: {
             data: {
-                full_name: 'Howell Chisom',
+                full_name: 'Chisom Howell',
                 fca_id: 'FCA-ETERNAL',
                 status: 'APPROVED',
                 is_admin: 'true',
-                department: 'FUTO Chess Association',
-                faculty: 'FUTO',
+                department: 'Software Engineering',
+                faculty: 'SICT',
+                lichess_username: 'strengthofLSB',
+                avatar_url: '/chisom-howell.jpg',
                 reg_number: 'HONORARY'
             }
         }

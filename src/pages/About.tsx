@@ -89,15 +89,20 @@ export default function About() {
 
           <div className="glass-card p-6">
             <Users className="w-6 h-6 text-cta mb-4" />
-            <h3 className="font-heading text-sm tracking-wider mb-3">FCA Executive</h3>
+            <h3 className="font-heading text-sm tracking-wider mb-3">FCA Executive & Notable Figures</h3>
             <div className="space-y-3">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs text-primary font-medium">
-                  CH
-                </div>
+                <img
+                  src="/chisom-howell.jpeg"
+                  alt="Chisom Howell"
+                  className="w-9 h-9 rounded-full object-cover border-2 border-purple-500/50"
+                />
                 <div>
-                  <p className="text-text text-sm font-medium">Chisom Howell</p>
-                  <p className="text-text-muted text-xs">FCA Eternal Founder</p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-text text-sm font-medium">Chisom Howell</p>
+                    <span className="fet-shimmer-badge px-1 py-0.2 rounded text-[9px] font-bold">FET</span>
+                  </div>
+                  <p className="text-purple-300 text-xs">FCA Eternal • Notable Player (SICT)</p>
                 </div>
               </div>
               <p className="text-text-muted text-xs mt-4">
