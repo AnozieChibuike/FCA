@@ -195,9 +195,14 @@ export default function Leaderboards() {
                 ) : (
                   players.map((entry) => {
                     const player = entry.player;
-                    const isImmortal = player.is_immortal;
+                    const isImmortal = player.is_immortal || player.fca_id === 'FCA-ETERNAL';
                     const activeTitleKey = isImmortal ? 'FET' : player.earned_title;
                     const titleConfig = TITLE_CONFIG[activeTitleKey];
+
+                    const avatarUrl = isImmortal ? (player.avatar_url || '/chisom-howell.jpeg') : player.avatar_url;
+                    const department = isImmortal ? 'Software Engineering' : (player.department || '-');
+                    const faculty = isImmortal ? 'SICT' : (player.faculty || '-');
+                    const lichessUser = isImmortal ? (player.lichess_username || 'strengthofLSB') : player.lichess_username;
 
                     return (
                       <tr key={player.id} className="hover:bg-[#2E2B27] transition-colors cursor-pointer" onClick={() => navigate(`/profile/${player.id}`)}>
@@ -210,8 +215,8 @@ export default function Leaderboards() {
                         <td className="p-4 align-middle">
                           <div className="flex items-center gap-3">
                             <div className="w-9 h-9 rounded-full overflow-hidden bg-[#161512] border border-chess-border flex items-center justify-center flex-shrink-0">
-                              {player.avatar_url ? (
-                                <img src={player.avatar_url} alt={player.full_name} className="w-full h-full object-cover" />
+                              {avatarUrl ? (
+                                <img src={avatarUrl} alt={player.full_name} className="w-full h-full object-cover" />
                               ) : (
                                 <User className="w-4 h-4 text-text-muted" />
                               )}
@@ -235,7 +240,7 @@ export default function Leaderboards() {
 
                         <td className="p-4 align-middle text-center">
                           <div className="flex items-center justify-center gap-2.5 text-text-muted">
-                            {player.lichess_username && (
+                            {lichessUser && (
                               <svg viewBox='-2 -2 54 54' xmlns='http://www.w3.org/2000/svg' className="w-4 h-4"><path fill='currentColor' stroke='currentColor' strokeLinejoin='round'
                                 d='M38.956.5c-3.53.418-6.452.902-9.286 2.984C5.534 1.786-.692 18.533.68 29.364 3.493 50.214 31.918 55.785 41.329 41.7c-7.444 7.696-19.276 8.752-28.323 3.084C3.959 39.116-.506 27.392 4.683 17.567 9.873 7.742 18.996 4.535 29.03 6.405c2.43-1.418 5.225-3.22 7.655-3.187l-1.694 4.86 12.752 21.37c-.439 5.654-5.459 6.112-5.459 6.112-.574-1.47-1.634-2.942-4.842-6.036-3.207-3.094-17.465-10.177-15.788-16.207-2.001 6.967 10.311 14.152 14.04 17.663 3.73 3.51 5.426 6.04 5.795 6.756 0 0 9.392-2.504 7.838-8.927L37.4 7.171z' /></svg>
                             )}
@@ -253,7 +258,7 @@ export default function Leaderboards() {
                                 </g>
                               </svg>
                             )}
-                            {!player.lichess_username && !player.chesscom_username && (
+                            {!lichessUser && !player.chesscom_username && (
                               <span className="text-xs opacity-50">-</span>
                             )}
                           </div>
@@ -261,7 +266,7 @@ export default function Leaderboards() {
 
                         <td className="p-4 align-middle">
                           <span className="text-text-muted text-xs">
-                            {player.department || '-'} / {player.faculty || '-'}
+                            {department} / {faculty}
                           </span>
                         </td>
 

@@ -10,6 +10,7 @@ import { supabase } from '../lib/supabase';
 import { fetchAndPreviewArena, commitArenaImport, extractLichessGameId } from '../lib/lichess';
 import { calculateElo, getKFactor, getTitleForRating } from '../lib/elo';
 import type { PreviewGame, ArenaImportReport, Game, Profile, GameMode } from '../types';
+import EventSelector from '../components/EventSelector';
 
 type Step = 'form' | 'preview' | 'confirming' | 'done';
 type ConsoleTab = 'arena' | 'otb';
@@ -397,19 +398,13 @@ export default function AdminConsole() {
                     </p>
                   </div>
 
-                  <div>
-                    <label htmlFor="eventName" className="block text-sm font-medium text-text mb-2">
-                      Event Name
-                    </label>
-                    <input
-                      id="eventName"
-                      type="text"
-                      value={eventName}
-                      onChange={(e) => setEventName(e.target.value)}
-                      className="input-field"
-                      placeholder="e.g., FCA Weekly Blitz - Week 12"
-                    />
-                  </div>
+                  <EventSelector
+                    value={eventName}
+                    onChange={setEventName}
+                    label="Event Name"
+                    id="eventName"
+                    placeholder="e.g., FCA Weekly Blitz - Week 12"
+                  />
 
                   <button
                     onClick={handlePreview}
@@ -558,20 +553,13 @@ export default function AdminConsole() {
                 </div>
               </div>
 
-              {/* Event Name Input */}
-              <div>
-                <label htmlFor="otbEventName" className="block text-xs font-bold text-text-muted uppercase tracking-wider mb-2">
-                  Event / Match Description
-                </label>
-                <input
-                  id="otbEventName"
-                  type="text"
-                  value={otbEventName}
-                  onChange={(e) => setOtbEventName(e.target.value)}
-                  className="input-field text-sm"
-                  placeholder="e.g., FUTO Campus Classical Championship 2026 - Round 1"
-                />
-              </div>
+              <EventSelector
+                value={otbEventName}
+                onChange={setOtbEventName}
+                label="Event / Match Description"
+                id="otbEventName"
+                placeholder="e.g., FUTO Campus Classical Championship 2026 - Round 1"
+              />
 
               <button
                 type="submit"

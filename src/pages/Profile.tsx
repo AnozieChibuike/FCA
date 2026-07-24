@@ -247,8 +247,17 @@ export default function Profile() {
     );
   }
 
-  const activeTitleKey = player.is_immortal ? 'FET' : player.earned_title;
+  const isImmortal = player.is_immortal || player.fca_id === 'FCA-ETERNAL';
+  const activeTitleKey = isImmortal ? 'FET' : player.earned_title;
   const titleConfig = TITLE_CONFIG[activeTitleKey];
+
+  const displayAvatar = isImmortal ? (player.avatar_url || '/chisom-howell.jpeg') : player.avatar_url;
+  const displayDept = isImmortal ? (player.department && player.department !== 'FUTO Chess Association' ? player.department : 'Software Engineering') : player.department;
+  const displayFaculty = isImmortal ? (player.faculty && player.faculty !== 'FUTO' ? player.faculty : 'SICT') : player.faculty;
+  const displayBio = isImmortal
+    ? (player.bio && !player.bio.includes('founder') ? player.bio : 'A notable and remarkably skilled chess player in FCA history. Remembered for his sharp tactical mind, competitive drive, and passion for chess. Forever in our hearts.')
+    : player.bio;
+  const displayLichess = isImmortal ? (player.lichess_username || 'strengthofLSB') : player.lichess_username;
 
   return (
     <div className="min-h-screen px-4 sm:px-6 pt-24 sm:pt-28 pb-12 sm:pb-16 max-w-5xl mx-auto">
@@ -260,8 +269,8 @@ export default function Profile() {
               onClick={() => isOwnProfile && fileInputRef.current?.click()}>
               {avatarUploading ? (
                 <div className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-              ) : player.avatar_url ? (
-                <img src={player.avatar_url} alt={player.full_name} className="w-full h-full object-cover" />
+              ) : displayAvatar ? (
+                <img src={displayAvatar} alt={player.full_name} className="w-full h-full object-cover" />
               ) : (
                 <User className="w-14 h-14 text-text-muted" />
               )}
@@ -323,13 +332,13 @@ export default function Profile() {
                   {player.full_name}
                 </h1>
                 <p className="text-text-muted text-xs sm:text-sm mb-3">
-                  {player.department} · {player.faculty}
+                  {displayDept} · {displayFaculty}
                 </p>
               </div>
             )}
 
-            {player.bio && !editing && (
-              <p className="text-text-muted text-xs sm:text-sm leading-relaxed mb-4 max-w-2xl">{player.bio}</p>
+            {displayBio && !editing && (
+              <p className="text-text-muted text-xs sm:text-sm leading-relaxed mb-4 max-w-2xl">{displayBio}</p>
             )}
 
             {/* Chess Handles */}
@@ -345,7 +354,7 @@ export default function Profile() {
                   <div className="p-3 rounded bg-[#161512] border border-chess-border text-xs">
                     <p className="text-text-muted mb-1 font-semibold">Lichess Verification</p>
                     <p className="text-emerald-400 font-mono mb-2">
-                      {player.lichess_username ? `@${player.lichess_username} (Verified via OAuth)` : 'No Lichess Account Connected'}
+                      {displayLichess ? `@${displayLichess} (Verified)` : 'No Lichess Account Connected'}
                     </p>
                     <button
                       type="button"
@@ -353,13 +362,13 @@ export default function Profile() {
                       className="btn-secondary py-1.5 px-3 text-xs font-bold inline-flex items-center gap-1.5"
                     >
                       <ExternalLink className="w-3.5 h-3.5" />
-                      {player.lichess_username ? 'Reconnect Lichess via OAuth' : 'Connect Lichess via OAuth'}
+                      {displayLichess ? 'Reconnect Lichess via OAuth' : 'Connect Lichess via OAuth'}
                     </button>
                   </div>
                 </div>
               ) : (
                 <div className="flex flex-wrap items-center gap-3">
-                  {player.lichess_username ? (
+                  {displayLichess ? (
                     <button
                       type="button"
                       onClick={() => setShowLichessModal(true)}
@@ -367,7 +376,7 @@ export default function Profile() {
                       title="Click to view details or disconnect"
                     >
                       <LichessIcon className="w-4 h-4 text-white flex-shrink-0" />
-                      <span>@{player.lichess_username}</span>
+                      <span>@{displayLichess}</span>
                     </button>
                   ) : (
                     <button
@@ -537,7 +546,7 @@ export default function Profile() {
         </div>
 
         {/* Lichess Account Interactive Popup Modal */}
-        {showLichessModal && player && player.lichess_username && (
+        {showLichessModal && player && displayLichess && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
             <div className="glass-card p-6 max-w-sm w-full border border-chess-border text-center shadow-2xl relative">
               <button
@@ -552,11 +561,11 @@ export default function Profile() {
               </div>
 
               <h3 className="font-heading text-lg text-white mb-0.5">Lichess Account</h3>
-              <p className="text-white font-mono text-base font-bold mb-5">@{player.lichess_username}</p>
+              <p className="text-white font-mono text-base font-bold mb-5">@{displayLichess}</p>
 
               <div className="space-y-2.5">
                 <a
-                  href={`https://lichess.org/@/${player.lichess_username}`}
+                  href={`https://lichess.org/@/${displayLichess}`}
                   target="_blank"
                   rel="noreferrer"
                   onClick={() => setShowLichessModal(false)}
