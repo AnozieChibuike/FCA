@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Calendar, MapPin, Globe, ArrowRight, Zap, Flame, Hourglass, Rocket, Clock } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import type { Tournament, GameMode } from '../types';
+import type { Tournament } from '../types';
 import TournamentCalendarModal from './TournamentCalendarModal';
 
 export default function UpcomingEvents() {
@@ -17,15 +17,40 @@ export default function UpcomingEvents() {
     try {
       const now = new Date().toISOString();
       // Fetch upcoming tournaments (start_date >= now) sorted ascending so nearest to today comes first!
-      const { data } = await supabase
+      const { data: tournamentsData } = await supabase
         .from('tournaments')
         .select('*')
         .gte('start_date', now)
-        .order('start_date', { ascending: true })
-        .limit(3);
+        .order('start_date', { ascending: true });
 
-      if (data && data.length > 0) {
-        setEvents(data as Tournament[]);
+      // Fetch logged games to detect tournaments that have already started
+      const { data: gamesData } = await supabase
+        .from('games')
+        .select('event_name');
+
+      const loggedEventNames = new Set<string>();
+      if (gamesData) {
+        gamesData.forEach((g) => {
+          if (g.event_name) {
+            const clean = g.event_name.replace(/\s*\[[a-zA-Z0-9]{8,12}\]/, '').trim().toLowerCase();
+            loggedEventNames.add(clean);
+          }
+        });
+      }
+
+      if (tournamentsData && tournamentsData.length > 0) {
+        const upcomingFiltered = (tournamentsData as Tournament[]).filter((t) => {
+          // Remove if status is explicitly COMPLETED or ONGOING
+          if (t.status && t.status !== 'SCHEDULED') return false;
+
+          // Remove if at least 1 game has been logged for this event (online or OTB)
+          const cleanTitle = t.title.trim().toLowerCase();
+          if (loggedEventNames.has(cleanTitle)) return false;
+
+          return true;
+        });
+
+        setEvents(upcomingFiltered.slice(0, 3));
       } else {
         setEvents([]);
       }
@@ -48,7 +73,7 @@ export default function UpcomingEvents() {
     return `${weekday}, ${month} ${day}  •  ${time}`;
   }
 
-  const MODE_CONFIG: Record<GameMode, { label: string; icon: any; style: string }> = {
+  const MODE_CONFIG: Record<string, { label: string; icon: any; style: string }> = {
     BLITZ: { label: 'Blitz', icon: Zap, style: 'bg-emerald-950/90 text-emerald-300 border-emerald-500/50' },
     RAPID: { label: 'Rapid', icon: Flame, style: 'bg-amber-950/90 text-amber-300 border-amber-500/50' },
     CLASSICAL: { label: 'Classical', icon: Hourglass, style: 'bg-sky-950/90 text-sky-300 border-sky-500/50' },
@@ -85,6 +110,7 @@ export default function UpcomingEvents() {
           {events.map((event) => {
             const config = MODE_CONFIG[event.mode] || MODE_CONFIG.BLITZ;
             const ModeIcon = config.icon;
+            const displayTc = event.time_control && event.time_control !== event.mode ? event.time_control : config.label;
 
             return (
               <div
@@ -97,7 +123,7 @@ export default function UpcomingEvents() {
                   </h3>
                   <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] sm:text-xs font-semibold border ${config.style} shrink-0`}>
                     <ModeIcon className="w-3 h-3" />
-                    <span>{config.label}</span>
+                    <span>{displayTc}</span>
                   </span>
                 </div>
 

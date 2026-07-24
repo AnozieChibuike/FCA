@@ -11,9 +11,10 @@ interface CreateTournamentModalProps {
 
 export default function CreateTournamentModal({ isOpen, onClose, onSuccess }: CreateTournamentModalProps) {
   const [title, setTitle] = useState('');
-  const [mode, setMode] = useState<GameMode>('BLITZ');
+  const [mode, setMode] = useState<GameMode | 'CUSTOM'>('BLITZ');
+  const [customTc, setCustomTc] = useState('');
   const [startDate, setStartDate] = useState('');
-  const [location, setLocation] = useState('SEET Arena');
+  const [location, setLocation] = useState('Maracana');
   const [isOnline, setIsOnline] = useState(false);
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
@@ -35,18 +36,29 @@ export default function CreateTournamentModal({ isOpen, onClose, onSuccess }: Cr
     setLoading(true);
     setError('');
 
+    const effectiveMode: GameMode = mode === 'CUSTOM' ? 'BLITZ' : mode;
+    const tcLabel = mode === 'CUSTOM' ? (customTc.trim() || 'Multi-TC') : mode;
+
     try {
-      const { error: insertErr } = await supabase.from('tournaments').insert({
+      const payload: Record<string, any> = {
         title: title.trim(),
-        mode,
+        mode: effectiveMode,
+        time_control: tcLabel,
         start_date: new Date(startDate).toISOString(),
         location: isOnline ? 'Lichess Online' : location.trim() || 'FUTO Campus',
         is_online: isOnline,
         description: description.trim(),
         status: 'SCHEDULED',
-      });
+      };
 
-      if (insertErr) throw insertErr;
+      const { error: insertErr } = await supabase.from('tournaments').insert(payload);
+
+      if (insertErr) {
+        // Fallback if time_control column is missing from DB schema
+        delete payload.time_control;
+        const { error: fallbackErr } = await supabase.from('tournaments').insert(payload);
+        if (fallbackErr) throw fallbackErr;
+      }
 
       onSuccess();
       onClose();
@@ -54,6 +66,8 @@ export default function CreateTournamentModal({ isOpen, onClose, onSuccess }: Cr
       setTitle('');
       setStartDate('');
       setDescription('');
+      setCustomTc('');
+      setMode('BLITZ');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create tournament.');
     } finally {
@@ -107,13 +121,14 @@ export default function CreateTournamentModal({ isOpen, onClose, onSuccess }: Cr
               </label>
               <select
                 value={mode}
-                onChange={(e) => setMode(e.target.value as GameMode)}
+                onChange={(e) => setMode(e.target.value as any)}
                 className="input-field cursor-pointer"
               >
                 <option value="BLITZ">⚡ Blitz</option>
                 <option value="RAPID">🔥 Rapid</option>
                 <option value="CLASSICAL">⏳ Classical</option>
                 <option value="BULLET">🚀 Bullet</option>
+                <option value="CUSTOM">🔀 Custom / Multi-TC</option>
               </select>
             </div>
 
@@ -130,6 +145,22 @@ export default function CreateTournamentModal({ isOpen, onClose, onSuccess }: Cr
               />
             </div>
           </div>
+
+          {mode === 'CUSTOM' && (
+            <div>
+              <label className="block text-xs font-bold text-text-muted uppercase tracking-wider mb-1">
+                Custom Time Control / Description
+              </label>
+              <input
+                type="text"
+                value={customTc}
+                onChange={(e) => setCustomTc(e.target.value)}
+                placeholder="e.g., 3+0, 5+0 Blitz or Multi-TC Arena"
+                className="input-field"
+                required
+              />
+            </div>
+          )}
 
           <div>
             <div className="flex items-center justify-between mb-1">

@@ -58,6 +58,7 @@ export interface Tournament {
   id: string;
   title: string;
   mode: GameMode;
+  time_control?: string;
   start_date: string;
   location: string;
   is_online: boolean;

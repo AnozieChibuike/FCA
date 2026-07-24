@@ -321,5 +321,17 @@ export async function commitArenaImport(
     report.processedGames++;
   }
 
+  if (report.processedGames > 0 && eventName) {
+    try {
+      const clean = eventName.replace(/\s*\[[a-zA-Z0-9]{8,12}\]/, '').trim();
+      await supabase
+        .from('tournaments')
+        .update({ status: 'COMPLETED' })
+        .ilike('title', clean);
+    } catch {
+      // Ignore if matching scheduled tournament title does not exist
+    }
+  }
+
   return report;
 }

@@ -23,6 +23,8 @@ export default function TournamentCalendarModal({ isOpen, onClose }: TournamentC
 
   const authenticated = isAdmin || isArbiter;
 
+  const [loggedEvents, setLoggedEvents] = useState<Set<string>>(new Set());
+
   useEffect(() => {
     if (isOpen) {
       fetchTournaments();
@@ -36,6 +38,21 @@ export default function TournamentCalendarModal({ isOpen, onClose }: TournamentC
         .from('tournaments')
         .select('*');
 
+      const { data: gamesData } = await supabase
+        .from('games')
+        .select('event_name');
+
+      const loggedSet = new Set<string>();
+      if (gamesData) {
+        gamesData.forEach((g) => {
+          if (g.event_name) {
+            const clean = g.event_name.replace(/\s*\[[a-zA-Z0-9]{8,12}\]/, '').trim().toLowerCase();
+            loggedSet.add(clean);
+          }
+        });
+      }
+      setLoggedEvents(loggedSet);
+
       if (data) {
         const list = data as Tournament[];
         const now = new Date().getTime();
@@ -44,8 +61,8 @@ export default function TournamentCalendarModal({ isOpen, onClose }: TournamentC
         list.sort((a, b) => {
           const tA = new Date(a.start_date).getTime();
           const tB = new Date(b.start_date).getTime();
-          const isAUpcoming = tA >= now;
-          const isBUpcoming = tB >= now;
+          const isAUpcoming = tA >= now && !loggedSet.has(a.title.trim().toLowerCase()) && a.status === 'SCHEDULED';
+          const isBUpcoming = tB >= now && !loggedSet.has(b.title.trim().toLowerCase()) && b.status === 'SCHEDULED';
 
           if (isAUpcoming && isBUpcoming) return tA - tB; // nearest upcoming first
           if (!isAUpcoming && !isBUpcoming) return tB - tA; // most recent past first
@@ -64,7 +81,8 @@ export default function TournamentCalendarModal({ isOpen, onClose }: TournamentC
   if (!isOpen) return null;
 
   const filteredTournaments = tournaments.filter((t) => {
-    const isUpcoming = new Date(t.start_date) >= new Date();
+    const hasGames = loggedEvents.has(t.title.trim().toLowerCase());
+    const isUpcoming = new Date(t.start_date) >= new Date() && !hasGames && t.status === 'SCHEDULED';
     if (statusFilter === 'UPCOMING' && !isUpcoming) return false;
     if (statusFilter === 'PAST' && isUpcoming) return false;
 
@@ -80,7 +98,7 @@ export default function TournamentCalendarModal({ isOpen, onClose }: TournamentC
     return true;
   });
 
-  const MODE_CONFIG: Record<GameMode, { label: string; icon: any; style: string }> = {
+  const MODE_CONFIG: Record<string, { label: string; icon: any; style: string }> = {
     BLITZ: { label: 'Blitz', icon: Zap, style: 'bg-emerald-950/90 text-emerald-300 border-emerald-500/50' },
     RAPID: { label: 'Rapid', icon: Flame, style: 'bg-amber-950/90 text-amber-300 border-amber-500/50' },
     CLASSICAL: { label: 'Classical', icon: Hourglass, style: 'bg-sky-950/90 text-sky-300 border-sky-500/50' },
@@ -177,9 +195,11 @@ export default function TournamentCalendarModal({ isOpen, onClose }: TournamentC
             </div>
           ) : (
             filteredTournaments.map((t) => {
-              const isUpcoming = new Date(t.start_date) >= new Date();
+              const hasGames = loggedEvents.has(t.title.trim().toLowerCase());
+              const isUpcoming = new Date(t.start_date) >= new Date() && !hasGames && t.status === 'SCHEDULED';
               const config = MODE_CONFIG[t.mode] || MODE_CONFIG.BLITZ;
               const ModeIcon = config.icon;
+              const displayTc = t.time_control && t.time_control !== t.mode ? t.time_control : config.label;
 
               return (
                 <div
@@ -212,7 +232,7 @@ export default function TournamentCalendarModal({ isOpen, onClose }: TournamentC
 
                     <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-semibold border ${config.style} shrink-0`}>
                       <ModeIcon className="w-3 h-3" />
-                      <span>{config.label}</span>
+                      <span>{displayTc}</span>
                     </span>
                   </div>
 
