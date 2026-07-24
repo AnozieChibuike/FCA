@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   Swords, Upload, AlertTriangle, CheckCircle, XCircle, Loader2,
   Shield, ArrowLeft, ArrowRight, Crown,
-  ExternalLink, History, RefreshCw, Check, Trophy
+  ExternalLink, History, RefreshCw, Check, Trophy, Calendar
 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
@@ -11,6 +11,7 @@ import { fetchAndPreviewArena, commitArenaImport, extractLichessGameId } from '.
 import { calculateElo, getKFactor, getTitleForRating } from '../lib/elo';
 import type { PreviewGame, ArenaImportReport, Game, Profile, GameMode } from '../types';
 import EventSelector from '../components/EventSelector';
+import CreateTournamentModal from '../components/CreateTournamentModal';
 
 type Step = 'form' | 'preview' | 'confirming' | 'done';
 type ConsoleTab = 'arena' | 'otb';
@@ -19,6 +20,7 @@ export default function AdminConsole() {
   const { isAdmin, isArbiter, loading: authLoading } = useAuth();
 
   const [activeTab, setActiveTab] = useState<ConsoleTab>('arena');
+  const [isCreateTourneyOpen, setIsCreateTourneyOpen] = useState(false);
 
   // Lichess Arena Importer State
   const [arenaId, setArenaId] = useState('');
@@ -338,6 +340,15 @@ export default function AdminConsole() {
           >
             <Trophy className="w-4 h-4" />
             <span>Log OTB Campus Match</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsCreateTourneyOpen(true)}
+            className="px-4 sm:px-5 py-2.5 min-h-[44px] rounded-lg text-xs sm:text-sm font-bold bg-[#161512] text-primary border border-primary/40 hover:border-primary flex items-center justify-center gap-2 transition-all cursor-pointer select-none active:scale-[0.98]"
+          >
+            <Calendar className="w-4 h-4 text-primary" />
+            <span>Schedule Tournament</span>
           </button>
         </div>
 
@@ -1013,6 +1024,12 @@ export default function AdminConsole() {
           )}
         </div>
       </div>
+
+      <CreateTournamentModal
+        isOpen={isCreateTourneyOpen}
+        onClose={() => setIsCreateTourneyOpen(false)}
+        onSuccess={() => {}}
+      />
     </div>
   );
 }

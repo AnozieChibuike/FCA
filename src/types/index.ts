@@ -54,6 +54,19 @@ export interface Game {
   black_player?: Profile;
 }
 
+export interface Tournament {
+  id: string;
+  title: string;
+  mode: GameMode;
+  start_date: string;
+  location: string;
+  is_online: boolean;
+  description: string;
+  status: 'SCHEDULED' | 'ONGOING' | 'COMPLETED';
+  created_by?: string;
+  created_at?: string;
+}
+
 export interface LeaderboardEntry {
   rank: number;
   player: Profile;

@@ -20,6 +20,7 @@ export default function Navbar() {
 
   const navLinks = [
     { path: '/', label: 'Home' },
+    { path: '/tournaments', label: 'Tournaments' },
     { path: '/leaderboards', label: 'Leaderboards' },
     { path: '/about', label: 'About' },
     { path: '/memorial', label: 'In Memoriam' },

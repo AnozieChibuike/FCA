@@ -6,6 +6,7 @@ import fcaLogo from '../assets/logo.png';
 import MemorialBanner from '../components/MemorialBanner';
 import type { Profile } from '../types';
 import PastTournaments from '../components/PastTournaments';
+import UpcomingEvents from '../components/UpcomingEvents';
 
 export default function Home() {
   const [stats, setStats] = useState({ totalPlayers: 0, totalGames: 0, topBlitz: null as Profile | null });
@@ -119,7 +120,9 @@ export default function Home() {
             </Link>
           </div>
 
-          <PastTournaments />
+          <UpcomingEvents />
+
+          <PastTournaments limit={3} />
 
           <MemorialBanner />
         </div>

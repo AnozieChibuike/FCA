@@ -27,22 +27,29 @@ export default function EventSelector({
 
   async function fetchEvents() {
     try {
-      const { data } = await supabase.from('games').select('event_name');
-      if (data) {
-        const eventsSet = new Set<string>();
-        // Always include default "Challenge"
-        eventsSet.add('Challenge');
+      const eventsSet = new Set<string>();
+      eventsSet.add('Challenge');
 
-        data.forEach((g) => {
+      // Fetch from games history
+      const { data: gamesData } = await supabase.from('games').select('event_name');
+      if (gamesData) {
+        gamesData.forEach((g) => {
           if (g.event_name) {
-            // Clean out Lichess IDs like [abc12345]
             const clean = g.event_name.replace(/\s*\[[a-zA-Z0-9]{8,12}\]/, '').trim();
             if (clean) eventsSet.add(clean);
           }
         });
-
-        setExistingEvents(Array.from(eventsSet));
       }
+
+      // Fetch from scheduled tournaments
+      const { data: tourneyData } = await supabase.from('tournaments').select('title');
+      if (tourneyData) {
+        tourneyData.forEach((t) => {
+          if (t.title && t.title.trim()) eventsSet.add(t.title.trim());
+        });
+      }
+
+      setExistingEvents(Array.from(eventsSet));
     } catch (err) {
       console.error('Failed to fetch past events:', err);
     } finally {

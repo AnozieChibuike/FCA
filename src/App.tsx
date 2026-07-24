@@ -14,6 +14,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import InviteLinks from './pages/InviteLinks';
 import About from './pages/About';
 import LichessCallback from './pages/LichessCallback';
+import Tournaments from './pages/Tournaments';
 import NotFound from './pages/NotFound';
 
 function ProfileRedirect() {
@@ -42,6 +43,7 @@ export default function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/join" element={<JoinFCA />} />
               <Route path="/leaderboards" element={<Leaderboards />} />
+              <Route path="/tournaments" element={<Tournaments />} />
               <Route path="/profile" element={<ProfileRedirect />} />
               <Route path="/profile/:id" element={<Profile />} />
               <Route path="/memorial" element={<Memorial />} />

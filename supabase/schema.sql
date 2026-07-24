@@ -199,3 +199,30 @@ WITH CHECK (
         WHERE id = (SELECT auth.uid()) AND (is_admin = TRUE OR is_arbiter = TRUE)
     )
 );
+
+-- 7. Tournaments Table
+CREATE TABLE IF NOT EXISTS tournaments (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    title TEXT NOT NULL,
+    mode game_mode NOT NULL DEFAULT 'BLITZ',
+    start_date TIMESTAMPTZ NOT NULL,
+    location TEXT NOT NULL DEFAULT 'SEET Arena',
+    is_online BOOLEAN DEFAULT FALSE,
+    description TEXT DEFAULT '',
+    status TEXT DEFAULT 'SCHEDULED',
+    created_by UUID REFERENCES profiles(id),
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE tournaments ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Tournaments are viewable by everyone" ON tournaments FOR SELECT USING (true);
+
+CREATE POLICY "Only admins/arbiters can manage tournaments"
+ON tournaments FOR ALL TO authenticated
+USING (
+    EXISTS (
+        SELECT 1 FROM profiles
+        WHERE id = (SELECT auth.uid()) AND (is_admin = TRUE OR is_arbiter = TRUE)
+    )
+);

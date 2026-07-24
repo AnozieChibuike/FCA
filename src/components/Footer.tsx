@@ -21,6 +21,9 @@ export default function Footer() {
           <div>
             <h4 className="font-semibold text-sm tracking-wide text-white mb-3">Quick Links</h4>
             <div className="flex flex-col gap-2">
+              <Link to="/tournaments" className="text-text-muted text-sm hover:text-white transition-colors duration-150 cursor-pointer">
+                Tournaments & Calendar
+              </Link>
               <Link to="/leaderboards" className="text-text-muted text-sm hover:text-white transition-colors duration-150 cursor-pointer">
                 Leaderboards
               </Link>
