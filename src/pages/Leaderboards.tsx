@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Search, Star, User } from 'lucide-react';
+import { Search, Star, User, Target } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import { TITLE_CONFIG, MODE_LABELS, type Profile, type GameMode, type LeaderboardEntry } from '../types';
 
@@ -8,6 +9,7 @@ const MODES: GameMode[] = ['BLITZ', 'RAPID', 'BULLET', 'CLASSICAL'];
 
 export default function Leaderboards() {
   const navigate = useNavigate();
+  const { profile } = useAuth();
   const [mode, setMode] = useState<GameMode>('BLITZ');
   const [players, setPlayers] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -18,6 +20,38 @@ export default function Leaderboards() {
 
   const [departments, setDepartments] = useState<string[]>([]);
   const [faculties, setFaculties] = useState<string[]>([]);
+
+  const myEntry = players.find((e) => profile && e.player.id === profile.id);
+
+  const jumpToMyPosition = () => {
+    if (!profile) return;
+
+    if (!myEntry && (searchQuery || departmentFilter || facultyFilter)) {
+      setSearchQuery('');
+      setDepartmentFilter('');
+      setFacultyFilter('');
+      setTimeout(() => {
+        const el = document.getElementById(`leaderboard-row-${profile.id}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          el.classList.add('ring-2', 'ring-primary', 'ring-offset-2', 'ring-offset-[#161512]');
+          setTimeout(() => {
+            el.classList.remove('ring-2', 'ring-primary', 'ring-offset-2', 'ring-offset-[#161512]');
+          }, 2500);
+        }
+      }, 350);
+      return;
+    }
+
+    const el = document.getElementById(`leaderboard-row-${profile.id}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('ring-2', 'ring-primary', 'ring-offset-2', 'ring-offset-[#161512]');
+      setTimeout(() => {
+        el.classList.remove('ring-2', 'ring-primary', 'ring-offset-2', 'ring-offset-[#161512]');
+      }, 2500);
+    }
+  };
 
   useEffect(() => {
     async function fetchLeaderboard() {
@@ -94,7 +128,21 @@ export default function Leaderboards() {
         {/* Header Area */}
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-5 mb-6 sm:mb-8">
           <div>
-            <h1 className="text-2xl sm:text-4xl font-extrabold text-white mb-1.5">Global Rankings</h1>
+            <div className="flex items-center gap-3 flex-wrap mb-1.5">
+              <h1 className="text-2xl sm:text-4xl font-extrabold text-white">Global Rankings</h1>
+              {profile && (
+                <button
+                  onClick={jumpToMyPosition}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-primary/10 border border-primary/40 text-primary hover:bg-primary hover:text-black transition-all cursor-pointer shadow-sm active:scale-95"
+                  title="Scroll directly to your rank on the leaderboard"
+                >
+                  <Target className="w-3.5 h-3.5" />
+                  <span>
+                    {myEntry ? `My Rank: #${myEntry.rank}` : 'Jump to My Rank'}
+                  </span>
+                </button>
+              )}
+            </div>
             <p className="text-text-muted text-xs sm:text-sm">Real-time Elo tracking across all verified FCA formats.</p>
           </div>
 
@@ -195,6 +243,7 @@ export default function Leaderboards() {
                 ) : (
                   players.map((entry) => {
                     const player = entry.player;
+                    const isCurrentUser = profile?.id === player.id;
                     const isImmortal = player.is_immortal || player.fca_id === 'FCA-ETERNAL';
                     const activeTitleKey = isImmortal ? 'FET' : player.earned_title;
                     const titleConfig = TITLE_CONFIG[activeTitleKey];
@@ -205,7 +254,16 @@ export default function Leaderboards() {
                     const lichessUser = isImmortal ? (player.lichess_username || 'strengthofLSB') : player.lichess_username;
 
                     return (
-                      <tr key={player.id} className="hover:bg-[#2E2B27] transition-colors cursor-pointer" onClick={() => navigate(`/profile/${player.id}`)}>
+                      <tr
+                        key={player.id}
+                        id={`leaderboard-row-${player.id}`}
+                        className={`transition-colors cursor-pointer ${
+                          isCurrentUser
+                            ? 'bg-primary/15 hover:bg-primary/25 border-l-4 border-l-primary shadow-[0_0_15px_rgba(234,179,8,0.15)] relative font-medium'
+                            : 'hover:bg-[#2E2B27]'
+                        }`}
+                        onClick={() => navigate(`/profile/${player.id}`)}
+                      >
                         <td className="p-4 text-center align-middle">
                           <div className="flex justify-center">
                             {getRankIcon(entry.rank)}
@@ -214,7 +272,9 @@ export default function Leaderboards() {
 
                         <td className="p-4 align-middle">
                           <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-full overflow-hidden bg-[#161512] border border-chess-border flex items-center justify-center flex-shrink-0">
+                            <div className={`w-9 h-9 rounded-full overflow-hidden bg-[#161512] border flex items-center justify-center flex-shrink-0 ${
+                              isCurrentUser ? 'border-primary shadow-[0_0_8px_rgba(234,179,8,0.3)]' : 'border-chess-border'
+                            }`}>
                               {avatarUrl ? (
                                 <img src={avatarUrl} alt={player.full_name} className="w-full h-full object-cover" />
                               ) : (
@@ -223,8 +283,13 @@ export default function Leaderboards() {
                             </div>
 
                             <div>
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 flex-wrap">
                                 <span className="font-bold text-white text-sm">{player.full_name}</span>
+                                {isCurrentUser && (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-black tracking-wider bg-primary text-black uppercase font-mono shadow-md inline-flex items-center gap-1">
+                                    YOU
+                                  </span>
+                                )}
                                 {activeTitleKey !== 'NONE' && (
                                   <span className={`px-2 py-0.5 rounded text-[10px] tracking-wider ${titleConfig.bg}`}>
                                     {titleConfig.tag}

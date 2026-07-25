@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import {
   Swords, Upload, AlertTriangle, CheckCircle, XCircle, Loader2,
   Shield, ArrowLeft, ArrowRight, Crown,
-  ExternalLink, History, RefreshCw, Check, Trophy, Calendar
+  ExternalLink, History, RefreshCw, Check, Trophy, Calendar,
+  ChevronLeft, ChevronRight, Filter
 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
@@ -51,6 +52,26 @@ export default function AdminConsole() {
   // Imported History State
   const [historyGames, setHistoryGames] = useState<Game[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [historyEventFilter, setHistoryEventFilter] = useState('');
+  const [historyPage, setHistoryPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
+
+  const uniqueEvents = Array.from(
+    new Set(
+      historyGames.map((g) => g.event_name.replace(/\s*\[[a-zA-Z0-9]{8,12}\]/, '').trim())
+    )
+  ).filter(Boolean).sort();
+
+  const filteredHistoryGames = historyGames.filter((g) => {
+    if (!historyEventFilter) return true;
+    const cleanName = g.event_name.replace(/\s*\[[a-zA-Z0-9]{8,12}\]/, '').trim();
+    return cleanName.toLowerCase() === historyEventFilter.toLowerCase();
+  });
+
+  const totalHistoryPages = Math.ceil(filteredHistoryGames.length / ITEMS_PER_PAGE) || 1;
+  const currentHistoryPage = Math.min(historyPage, totalHistoryPages);
+  const startIndex = (currentHistoryPage - 1) * ITEMS_PER_PAGE;
+  const paginatedHistoryGames = filteredHistoryGames.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   const authenticated = isAdmin || isArbiter;
 
@@ -959,7 +980,7 @@ export default function AdminConsole() {
 
         {/* IMPORTED GAMES HISTORY TABLE */}
         <div className="glass-card p-6 md:p-8 mt-10">
-          <div className="flex items-center justify-between flex-wrap gap-4 mb-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
             <div>
               <h2 className="font-heading text-xl tracking-wider flex items-center gap-2">
                 <History className="w-5 h-5 text-primary" />
@@ -969,14 +990,41 @@ export default function AdminConsole() {
                 All rated Lichess and official FCA games with direct external links
               </p>
             </div>
-            <button
-              onClick={fetchHistory}
-              disabled={loadingHistory}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-[#161512] border border-chess-border text-xs text-text-muted hover:text-white transition-colors"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${loadingHistory ? 'animate-spin' : ''}`} />
-              Refresh
-            </button>
+
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+              {/* Event Filter Dropdown */}
+              <div className="relative">
+                <Filter className="w-3.5 h-3.5 text-text-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <select
+                  value={historyEventFilter}
+                  onChange={(e) => {
+                    setHistoryEventFilter(e.target.value);
+                    setHistoryPage(1);
+                  }}
+                  className="bg-[#161512] border border-chess-border text-xs text-white rounded-md pl-8 pr-7 py-2 min-h-[38px] focus:outline-none focus:border-primary cursor-pointer appearance-none"
+                >
+                  <option value="">All Events ({historyGames.length})</option>
+                  {uniqueEvents.map((evt) => (
+                    <option key={evt} value={evt}>
+                      {evt}
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-text-muted text-[10px]">
+                  ▼
+                </div>
+              </div>
+
+              {/* Refresh Button */}
+              <button
+                onClick={fetchHistory}
+                disabled={loadingHistory}
+                className="flex items-center justify-center gap-2 px-3 py-2 min-h-[38px] rounded-md bg-[#161512] border border-chess-border text-xs text-text-muted hover:text-white transition-colors cursor-pointer"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loadingHistory ? 'animate-spin' : ''}`} />
+                <span>Refresh</span>
+              </button>
+            </div>
           </div>
 
           {loadingHistory ? (
@@ -984,86 +1032,122 @@ export default function AdminConsole() {
               <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-primary" />
               Loading imported games...
             </div>
-          ) : historyGames.length === 0 ? (
+          ) : filteredHistoryGames.length === 0 ? (
             <div className="py-10 text-center text-text-muted text-sm">
-              No games recorded yet.
+              {historyEventFilter ? `No games found for event "${historyEventFilter}".` : 'No games recorded yet.'}
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-chess-border text-xs text-text-muted uppercase tracking-wider">
-                    <th className="p-3">Event / Source</th>
-                    <th className="p-3">White Player</th>
-                    <th className="p-3 text-center">Result</th>
-                    <th className="p-3">Black Player</th>
-                    <th className="p-3 text-right">Lichess Link</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-chess-border/50">
-                  {historyGames.map((game) => {
-                    const gameId = extractLichessGameId(game);
-                    const lichessUrl = game.external_url || (gameId ? `https://lichess.org/${gameId}` : null);
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-chess-border text-xs text-text-muted uppercase tracking-wider">
+                      <th className="p-3">Event / Source</th>
+                      <th className="p-3">White Player</th>
+                      <th className="p-3 text-center">Result</th>
+                      <th className="p-3">Black Player</th>
+                      <th className="p-3 text-right">Lichess Link</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-chess-border/50">
+                    {paginatedHistoryGames.map((game) => {
+                      const gameId = extractLichessGameId(game);
+                      const lichessUrl = game.external_url || (gameId ? `https://lichess.org/${gameId}` : null);
 
-                    return (
-                      <tr key={game.id} className="hover:bg-[#2E2B27] transition-colors text-xs">
-                        <td className="p-3">
-                          <p className="font-semibold text-white truncate max-w-[180px]">
-                            {game.event_name.replace(/\s*\[[a-zA-Z0-9]{8,12}\]/, '')}
-                          </p>
-                          <span className="text-[10px] text-text-muted font-mono">
-                            {new Date(game.created_at).toLocaleDateString()}
-                          </span>
-                        </td>
-
-                        <td className="p-3">
-                          <span className="font-medium text-white">
-                            {game.white_player?.full_name || 'White'}
-                          </span>
-                        </td>
-
-                        <td className="p-3 text-center">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                            game.result === 1.0 ? 'bg-green-950 text-green-300 border border-green-700' :
-                            game.result === 0.0 ? 'bg-red-950 text-red-300 border border-red-700' :
-                            'bg-yellow-950 text-yellow-300 border border-yellow-700'
-                          }`}>
-                            {game.result === 1.0 ? '1 - 0' : game.result === 0.0 ? '0 - 1' : '½ - ½'}
-                          </span>
-                        </td>
-
-                        <td className="p-3">
-                          <span className="font-medium text-white">
-                            {game.black_player?.full_name || 'Black'}
-                          </span>
-                        </td>
-
-                        <td className="p-3 text-right">
-                          {game.source === 'OTB_MANUAL' ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-amber-950/60 border border-amber-500/40 text-amber-300 text-[11px] font-semibold">
-                              <Trophy className="w-3 h-3" />
-                              <span>Campus OTB</span>
+                      return (
+                        <tr key={game.id} className="hover:bg-[#2E2B27] transition-colors text-xs">
+                          <td className="p-3">
+                            <p className="font-semibold text-white truncate max-w-[180px]">
+                              {game.event_name.replace(/\s*\[[a-zA-Z0-9]{8,12}\]/, '')}
+                            </p>
+                            <span className="text-[10px] text-text-muted font-mono">
+                              {new Date(game.created_at).toLocaleDateString()}
                             </span>
-                          ) : lichessUrl ? (
-                            <a
-                              href={lichessUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-[#161512] border border-chess-border text-primary hover:border-primary/50 transition-colors text-[11px] font-medium"
-                            >
-                              <span>View Game</span>
-                              <ExternalLink className="w-3 h-3" />
-                            </a>
-                          ) : (
-                            <span className="text-text-muted text-[10px] opacity-60">FCA Local</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                          </td>
+
+                          <td className="p-3">
+                            <span className="font-medium text-white">
+                              {game.white_player?.full_name || 'White'}
+                            </span>
+                          </td>
+
+                          <td className="p-3 text-center">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              game.result === 1.0 ? 'bg-green-950 text-green-300 border border-green-700' :
+                              game.result === 0.0 ? 'bg-red-950 text-red-300 border border-red-700' :
+                              'bg-yellow-950 text-yellow-300 border border-yellow-700'
+                            }`}>
+                              {game.result === 1.0 ? '1 - 0' : game.result === 0.0 ? '0 - 1' : '½ - ½'}
+                            </span>
+                          </td>
+
+                          <td className="p-3">
+                            <span className="font-medium text-white">
+                              {game.black_player?.full_name || 'Black'}
+                            </span>
+                          </td>
+
+                          <td className="p-3 text-right">
+                            {game.source === 'OTB_MANUAL' ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-amber-950/60 border border-amber-500/40 text-amber-300 text-[11px] font-semibold">
+                                <Trophy className="w-3 h-3" />
+                                <span>Campus OTB</span>
+                              </span>
+                            ) : lichessUrl ? (
+                              <a
+                                href={lichessUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-[#161512] border border-chess-border text-primary hover:border-primary/50 transition-colors text-[11px] font-medium"
+                              >
+                                <span>View Game</span>
+                                <ExternalLink className="w-3 h-3" />
+                              </a>
+                            ) : (
+                              <span className="text-text-muted text-[10px] opacity-60">FCA Local</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* PAGINATION FOOTER */}
+              <div className="bg-[#1E1C18] border-t border-chess-border p-3 px-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-text-muted">
+                <span>
+                  Showing {startIndex + 1}-{Math.min(startIndex + ITEMS_PER_PAGE, filteredHistoryGames.length)} of {filteredHistoryGames.length} games
+                  {historyEventFilter && ` (Filtered)`}
+                </span>
+
+                {totalHistoryPages > 1 && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setHistoryPage((p) => Math.max(1, p - 1))}
+                      disabled={currentHistoryPage === 1}
+                      className="px-3 py-1.5 rounded bg-[#161512] border border-chess-border hover:text-white disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 transition-colors cursor-pointer"
+                    >
+                      <ChevronLeft className="w-3.5 h-3.5" />
+                      <span>Prev</span>
+                    </button>
+
+                    <span className="text-xs text-white font-mono px-2">
+                      Page <strong>{currentHistoryPage}</strong> of <strong>{totalHistoryPages}</strong>
+                    </span>
+
+                    <button
+                      onClick={() => setHistoryPage((p) => Math.min(totalHistoryPages, p + 1))}
+                      disabled={currentHistoryPage === totalHistoryPages}
+                      className="px-3 py-1.5 rounded bg-[#161512] border border-chess-border hover:text-white disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 transition-colors cursor-pointer"
+                    >
+                      <span>Next</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
           )}
         </div>
       </div>

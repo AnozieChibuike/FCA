@@ -2,7 +2,8 @@ import { useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   User, Edit3, Camera, X, LogOut,
-  History, Zap, Clock, Rocket, Landmark, TrendingUp, ExternalLink
+  History, Zap, Clock, Rocket, Landmark, TrendingUp, ExternalLink,
+  ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
@@ -42,7 +43,14 @@ export default function Profile() {
   const { profile: authProfile, refreshProfile } = useAuth();
   const [player, setPlayer] = useState<ProfileType | null>(null);
   const [allGames, setAllGames] = useState<Game[]>([]);
-  const [recentGames, setRecentGames] = useState<Game[]>([]);
+  const [gamesPage, setGamesPage] = useState(1);
+  const GAMES_PER_PAGE = 10;
+
+  const totalGamesPages = Math.ceil(allGames.length / GAMES_PER_PAGE) || 1;
+  const currentGamesPage = Math.min(gamesPage, totalGamesPages);
+  const startIndex = (currentGamesPage - 1) * GAMES_PER_PAGE;
+  const paginatedGames = allGames.slice(startIndex, startIndex + GAMES_PER_PAGE);
+
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -148,7 +156,7 @@ export default function Profile() {
 
         if (gamesData) {
           setAllGames(gamesData as unknown as Game[]);
-          setRecentGames(gamesData.slice(0, 10) as unknown as Game[]);
+          setGamesPage(1);
         }
       }
       setLoading(false);
@@ -469,9 +477,16 @@ export default function Profile() {
         )}
 
         {/* Match History Table */}
-        <div className="mb-4 flex items-center gap-2.5">
-          <History className="w-5 h-5 text-primary" />
-          <h2 className="text-xl font-extrabold text-white">Recent Match History</h2>
+        <div className="mb-4 flex items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2.5">
+            <History className="w-5 h-5 text-primary" />
+            <h2 className="text-xl font-extrabold text-white">Match History</h2>
+          </div>
+          {allGames.length > 0 && (
+            <span className="text-xs text-text-muted font-mono">
+              Total Matches Played: <strong className="text-white">{allGames.length}</strong>
+            </span>
+          )}
         </div>
 
         <div className="bg-surface border border-chess-border rounded-lg shadow-card overflow-hidden">
@@ -483,19 +498,19 @@ export default function Profile() {
                   <th className="p-4">White</th>
                   <th className="p-4">Black</th>
                   <th className="p-4 text-center">Result</th>
-                  <th className="p-4 text-center">Elo Chg</th>
+                  <th className="p-4 text-center">Format</th>
                   <th className="p-4">Event</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-chess-border">
-                {recentGames.length === 0 ? (
+                {paginatedGames.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="p-8 text-center text-text-muted italic">
-                      No recent games found.
+                      No games recorded yet.
                     </td>
                   </tr>
                 ) : (
-                  recentGames.map((game) => {
+                  paginatedGames.map((game) => {
                     const isWhite = game.white_player_id === player.id;
                     const resultColor =
                       (isWhite && game.result === 1) || (!isWhite && game.result === 0) ? 'bg-primary/20 text-primary border border-primary/30' :
@@ -520,8 +535,10 @@ export default function Profile() {
                             {resultText}
                           </span>
                         </td>
-                        <td className="p-4 text-center text-text-muted font-mono text-xs">
-                          -
+                        <td className="p-4 text-center">
+                          <span className="px-2.5 py-0.5 rounded text-[11px] font-bold bg-[#161512] border border-chess-border text-text-muted uppercase tracking-wider font-mono">
+                            {game.mode}
+                          </span>
                         </td>
                         <td className="p-4 text-text-muted text-xs flex items-center justify-between gap-2">
                           <span className="truncate max-w-[140px]">{game.event_name.replace(/\s*\[[a-zA-Z0-9]{8,12}\]/, '')}</span>
@@ -543,6 +560,41 @@ export default function Profile() {
               </tbody>
             </table>
           </div>
+
+          {/* PAGINATION FOOTER */}
+          {allGames.length > 0 && (
+            <div className="bg-[#1E1C18] border-t border-chess-border p-3 px-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-text-muted">
+              <span>
+                Showing {startIndex + 1}-{Math.min(startIndex + GAMES_PER_PAGE, allGames.length)} of {allGames.length} games
+              </span>
+
+              {totalGamesPages > 1 && (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setGamesPage((p) => Math.max(1, p - 1))}
+                    disabled={currentGamesPage === 1}
+                    className="px-3 py-1.5 rounded bg-[#161512] border border-chess-border hover:text-white disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 transition-colors cursor-pointer"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                    <span>Prev</span>
+                  </button>
+
+                  <span className="text-xs text-white font-mono px-2">
+                    Page <strong>{currentGamesPage}</strong> of <strong>{totalGamesPages}</strong>
+                  </span>
+
+                  <button
+                    onClick={() => setGamesPage((p) => Math.min(totalGamesPages, p + 1))}
+                    disabled={currentGamesPage === totalGamesPages}
+                    className="px-3 py-1.5 rounded bg-[#161512] border border-chess-border hover:text-white disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 transition-colors cursor-pointer"
+                  >
+                    <span>Next</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Lichess Account Interactive Popup Modal */}
