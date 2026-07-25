@@ -86,7 +86,7 @@ export default function Leaderboards() {
             player,
             elo: player[`${mode.toLowerCase()}_elo` as keyof Profile] as number,
             games: player[`${mode.toLowerCase()}_games` as keyof Profile] as number,
-            peak_elo: player[`${mode.toLowerCase()}_peak_elo` as keyof Profile] as number,
+            peak_elo: (player[`peak_${mode.toLowerCase()}_elo` as keyof Profile] as number) ?? (player[`${mode.toLowerCase()}_elo` as keyof Profile] as number),
           };
         });
         setPlayers(entries);

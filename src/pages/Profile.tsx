@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   User, Edit3, Camera, X, LogOut,
@@ -8,6 +8,7 @@ import {
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
 import { initiateLichessOAuth } from '../lib/lichessOAuth';
+import { calculateElo, getKFactor } from '../lib/elo';
 import {
   TITLE_CONFIG, MODE_LABELS,
   type Profile as ProfileType, type GameMode, type Game
@@ -46,10 +47,79 @@ export default function Profile() {
   const [gamesPage, setGamesPage] = useState(1);
   const GAMES_PER_PAGE = 10;
 
-  const totalGamesPages = Math.ceil(allGames.length / GAMES_PER_PAGE) || 1;
+  const enrichedGames = useMemo(() => {
+    if (!player || allGames.length === 0) return [];
+
+    // Sort games chronologically (oldest first) to calculate sequential Elo & Peak
+    const sorted = [...allGames].sort(
+      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    );
+
+    const runningElo: Record<string, number> = {};
+    const runningGamesCount: Record<string, number> = {};
+    const runningPeak: Record<string, number> = {};
+
+    const map = new Map<
+      string,
+      {
+        eloBefore: number;
+        eloAfter: number;
+        eloDiff: number;
+        peakElo: number;
+      }
+    >();
+
+    for (const g of sorted) {
+      const isWhite = g.white_player_id === player.id;
+      const userId = player.id;
+      const oppId = isWhite ? g.black_player_id : g.white_player_id;
+      const modeKey = `${userId}_${g.mode}`;
+      const oppModeKey = `${oppId}_${g.mode}`;
+
+      const uElo = runningElo[modeKey] ?? 1200;
+      const oElo = runningElo[oppModeKey] ?? 1200;
+
+      const uGames = runningGamesCount[modeKey] ?? 0;
+      const oGames = runningGamesCount[oppModeKey] ?? 0;
+
+      const uPeak = runningPeak[modeKey] ?? uElo;
+
+      const scoreU = isWhite ? g.result : 1 - g.result;
+
+      const kU = getKFactor(uGames);
+      const kO = getKFactor(oGames);
+
+      const { newA: newU, newB: newO } = calculateElo(uElo, oElo, scoreU, kU, kO);
+
+      const diff = newU - uElo;
+      const nextPeak = Math.max(uPeak, newU);
+
+      map.set(g.id, {
+        eloBefore: uElo,
+        eloAfter: newU,
+        eloDiff: diff,
+        peakElo: nextPeak,
+      });
+
+      runningElo[modeKey] = newU;
+      runningGamesCount[modeKey] = uGames + 1;
+      runningPeak[modeKey] = nextPeak;
+
+      runningElo[oppModeKey] = newO;
+      runningGamesCount[oppModeKey] = oGames + 1;
+      runningPeak[oppModeKey] = Math.max(runningPeak[oppModeKey] ?? oElo, newO);
+    }
+
+    return allGames.map((g) => ({
+      ...g,
+      stats: map.get(g.id) || { eloBefore: 1200, eloAfter: 1200, eloDiff: 0, peakElo: 1200 },
+    }));
+  }, [allGames, player]);
+
+  const totalGamesPages = Math.ceil(enrichedGames.length / GAMES_PER_PAGE) || 1;
   const currentGamesPage = Math.min(gamesPage, totalGamesPages);
   const startIndex = (currentGamesPage - 1) * GAMES_PER_PAGE;
-  const paginatedGames = allGames.slice(startIndex, startIndex + GAMES_PER_PAGE);
+  const paginatedGames = enrichedGames.slice(startIndex, startIndex + GAMES_PER_PAGE);
 
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
@@ -452,19 +522,27 @@ export default function Profile() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           {MODES.map((mode) => {
             const elo = player[`${mode.toLowerCase()}_elo` as keyof ProfileType] as number;
-            const peak = player[`${mode.toLowerCase()}_peak_elo` as keyof ProfileType] as number;
-            const isPeakHigher = peak > elo;
+            const peak = (player[`peak_${mode.toLowerCase()}_elo` as keyof ProfileType] as number) ?? elo;
+            const games = player[`${mode.toLowerCase()}_games` as keyof ProfileType] as number;
 
             return (
               <div key={mode} className="bg-surface border border-chess-border p-5 rounded-lg shadow-card hover:border-primary/50 transition-colors">
-                <div className="flex items-center gap-2 mb-2">
-                  {MODE_ICONS[mode]}
-                  <span className="text-xs font-semibold text-text-muted uppercase tracking-wider">{MODE_LABELS[mode]}</span>
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-1.5">
+                    {MODE_ICONS[mode]}
+                    <span className="text-xs font-semibold text-text-muted uppercase tracking-wider">{MODE_LABELS[mode]}</span>
+                  </div>
+                  <span className="text-[10px] text-text-muted font-mono bg-[#161512] px-1.5 py-0.5 rounded border border-chess-border">
+                    {games} games
+                  </span>
                 </div>
-                <div className="text-3xl font-extrabold text-white mb-1">{elo}</div>
-                <div className={`text-xs font-medium flex items-center gap-1 ${isPeakHigher ? 'text-primary' : 'text-text-muted'}`}>
-                  {isPeakHigher ? <TrendingUp className="w-3 h-3" /> : <span className="w-3 text-center">-</span>}
-                  Peak: {peak}
+                <div className="text-3xl font-extrabold text-white mb-2">{elo}</div>
+                <div className="text-xs font-medium flex items-center justify-between text-text-muted pt-2 border-t border-chess-border/60">
+                  <span className="flex items-center gap-1 text-emerald-400 font-semibold">
+                    <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+                    Peak Elo:
+                  </span>
+                  <span className="text-emerald-400 font-bold font-mono text-sm">{peak}</span>
                 </div>
               </div>
             );
@@ -495,11 +573,11 @@ export default function Profile() {
               <thead>
                 <tr className="bg-[#1E1C18] border-b border-chess-border text-text-muted text-xs uppercase tracking-wider font-semibold">
                   <th className="p-4">Date</th>
-                  <th className="p-4">White</th>
-                  <th className="p-4">Black</th>
+                  <th className="p-4">Format</th>
+                  <th className="p-4">Match Opponent</th>
                   <th className="p-4 text-center">Result</th>
-                  <th className="p-4 text-center">Format</th>
-                  <th className="p-4">Event</th>
+                  <th className="p-4 text-center">Elo Rating & Change</th>
+                  <th className="p-4 text-right">Event / Link</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-chess-border">
@@ -512,46 +590,74 @@ export default function Profile() {
                 ) : (
                   paginatedGames.map((game) => {
                     const isWhite = game.white_player_id === player.id;
-                    const resultColor =
-                      (isWhite && game.result === 1) || (!isWhite && game.result === 0) ? 'bg-primary/20 text-primary border border-primary/30' :
-                        (isWhite && game.result === 0) || (!isWhite && game.result === 1) ? 'bg-red-950/50 text-red-400 border border-red-800' :
-                          'bg-gray-800 text-gray-300 border border-gray-700';
+                    const opponent = isWhite ? game.black_player : game.white_player;
+                    const stats = game.stats;
 
-                    const resultText = game.result === 1 ? '1 - 0' : game.result === 0 ? '0 - 1' : '½ - ½';
+                    const isWin = (isWhite && game.result === 1) || (!isWhite && game.result === 0);
+                    const isLoss = (isWhite && game.result === 0) || (!isWhite && game.result === 1);
+
+                    const resultColor = isWin
+                      ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-600/60'
+                      : isLoss
+                        ? 'bg-rose-950/80 text-rose-300 border border-rose-700/60'
+                        : 'bg-amber-950/80 text-amber-300 border border-amber-700/60';
+
+                    const resultLabel = isWin ? '1 - 0 WIN' : isLoss ? '0 - 1 LOSS' : '½ - ½ DRAW';
+
+                    const diffStr = stats.eloDiff > 0 ? `+${stats.eloDiff}` : `${stats.eloDiff}`;
+                    const diffColor = stats.eloDiff > 0
+                      ? 'text-emerald-400 font-bold'
+                      : stats.eloDiff < 0
+                        ? 'text-rose-400 font-bold'
+                        : 'text-text-muted font-medium';
 
                     return (
                       <tr key={game.id} className="hover:bg-[#2E2B27] transition-colors">
                         <td className="p-4 text-text-muted text-xs font-mono">
                           {new Date(game.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                         </td>
-                        <td className={`p-4 ${isWhite ? 'text-white font-bold' : 'text-text-muted'}`}>
-                          {game.white_player?.full_name || 'Unknown'}
-                        </td>
-                        <td className={`p-4 ${!isWhite ? 'text-white font-bold' : 'text-text-muted'}`}>
-                          {game.black_player?.full_name || 'Unknown'}
-                        </td>
-                        <td className="p-4 text-center">
-                          <span className={`px-2 py-0.5 rounded text-xs font-bold ${resultColor}`}>
-                            {resultText}
-                          </span>
-                        </td>
-                        <td className="p-4 text-center">
+
+                        <td className="p-4">
                           <span className="px-2.5 py-0.5 rounded text-[11px] font-bold bg-[#161512] border border-chess-border text-text-muted uppercase tracking-wider font-mono">
                             {game.mode}
                           </span>
                         </td>
-                        <td className="p-4 text-text-muted text-xs flex items-center justify-between gap-2">
-                          <span className="truncate max-w-[140px]">{game.event_name.replace(/\s*\[[a-zA-Z0-9]{8,12}\]/, '')}</span>
-                          {(() => {
-                            const gId = extractLichessGameId(game);
-                            const lUrl = game.external_url || (gId ? `https://lichess.org/${gId}` : null);
-                            return lUrl ? (
-                              <a href={lUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline text-[11px] font-medium ml-2">
-                                <span>Lichess</span>
-                                <ExternalLink className="w-3 h-3" />
-                              </a>
-                            ) : null;
-                          })()}
+
+                        <td className="p-4">
+                          <div className="flex items-center gap-1.5 text-xs">
+                            <span className="text-text-muted font-medium">vs</span>
+                            <span className="font-bold text-white">{opponent?.full_name || (isWhite ? 'Black' : 'White')}</span>
+                            <span className="text-[10px] text-text-muted font-mono">({isWhite ? 'White' : 'Black'})</span>
+                          </div>
+                        </td>
+
+                        <td className="p-4 text-center">
+                          <span className={`px-2 py-0.5 rounded text-xs font-extrabold ${resultColor}`}>
+                            {resultLabel}
+                          </span>
+                        </td>
+
+                        <td className="p-4 text-center font-mono text-xs">
+                          <span className="text-white font-bold text-sm">{stats.eloAfter}</span>
+                          <span className={`ml-2 ${diffColor}`}>
+                            ({diffStr})
+                          </span>
+                        </td>
+
+                        <td className="p-4 text-right text-text-muted text-xs">
+                          <div className="flex items-center justify-end gap-2">
+                            <span className="truncate max-w-[130px] font-medium">{game.event_name.replace(/\s*\[[a-zA-Z0-9]{8,12}\]/, '')}</span>
+                            {(() => {
+                              const gId = extractLichessGameId(game);
+                              const lUrl = game.external_url || (gId ? `https://lichess.org/${gId}` : null);
+                              return lUrl ? (
+                                <a href={lUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline text-[11px] font-medium">
+                                  <span>Lichess</span>
+                                  <ExternalLink className="w-3 h-3" />
+                                </a>
+                              ) : null;
+                            })()}
+                          </div>
                         </td>
                       </tr>
                     );
