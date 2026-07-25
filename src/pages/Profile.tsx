@@ -1,43 +1,17 @@
-import { useEffect, useState, useRef, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
-import {
-  User, Edit3, Camera, X, LogOut,
-  History, Zap, Clock, Rocket, Landmark, TrendingUp, ExternalLink,
-  ChevronLeft, ChevronRight
-} from 'lucide-react';
+import { User } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
-import { initiateLichessOAuth } from '../lib/lichessOAuth';
 import { calculateElo, getKFactor } from '../lib/elo';
-import {
-  TITLE_CONFIG, MODE_LABELS,
-  type Profile as ProfileType, type GameMode, type Game
-} from '../types';
+import { type Profile as ProfileType, type Game } from '../types';
 import PlayerStats from '../components/PlayerStats';
-import { FUTO_FACULTIES } from '../data/futoData';
-import { extractLichessGameId } from '../lib/lichess';
-import ChesscomVerifyModal, { ChesscomIcon } from '../components/ChesscomVerifyModal';
+import ChesscomVerifyModal from '../components/ChesscomVerifyModal';
 
-const MODES: GameMode[] = ['BLITZ', 'RAPID', 'BULLET', 'CLASSICAL'];
-const MODE_ICONS: Record<GameMode, React.ReactNode> = {
-  BLITZ: <Zap className="w-4 h-4 text-primary" />,
-  RAPID: <Clock className="w-4 h-4 text-primary" />,
-  BULLET: <Rocket className="w-4 h-4 text-primary" />,
-  CLASSICAL: <Landmark className="w-4 h-4 text-primary" />
-};
-
-function LichessIcon({ className = "w-4 h-4" }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="-2 -2 54 54" xmlns="http://www.w3.org/2000/svg">
-      <path
-        fill="currentColor"
-        stroke="currentColor"
-        strokeLinejoin="round"
-        d="M38.956.5c-3.53.418-6.452.902-9.286 2.984C5.534 1.786-.692 18.533.68 29.364 3.493 50.214 31.918 55.785 41.329 41.7c-7.444 7.696-19.276 8.752-28.323 3.084C3.959 39.116-.506 27.392 4.683 17.567 9.873 7.742 18.996 4.535 29.03 6.405c2.43-1.418 5.225-3.22 7.655-3.187l-1.694 4.86 12.752 21.37c-.439 5.654-5.459 6.112-5.459 6.112-.574-1.47-1.634-2.942-4.842-6.036-3.207-3.094-17.465-10.177-15.788-16.207-2.001 6.967 10.311 14.152 14.04 17.663 3.73 3.51 5.426 6.04 5.795 6.756 0 0 9.392-2.504 7.838-8.927L37.4 7.171z"
-      />
-    </svg>
-  );
-}
+import ProfileHeader from '../components/profile/ProfileHeader';
+import ModeRatingsGrid from '../components/profile/ModeRatingsGrid';
+import MatchHistoryTable from '../components/profile/MatchHistoryTable';
+import { LichessAccountModal, ChesscomAccountModal } from '../components/profile/AccountModals';
 
 export default function Profile() {
   const { id } = useParams<{ id: string }>();
@@ -47,10 +21,30 @@ export default function Profile() {
   const [gamesPage, setGamesPage] = useState(1);
   const GAMES_PER_PAGE = 10;
 
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [editForm, setEditForm] = useState({
+    full_name: '',
+    bio: '',
+    phone: '',
+    lichess_username: '',
+    chesscom_username: '',
+    department: '',
+    faculty: '',
+  });
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [showLichessModal, setShowLichessModal] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
+  const [showChesscomVerifyModal, setShowChesscomVerifyModal] = useState(false);
+  const [showChesscomDetailModal, setShowChesscomDetailModal] = useState(false);
+  const [disconnectingChesscom, setDisconnectingChesscom] = useState(false);
+
+  const isOwnProfile = authProfile?.id === id;
+
   const enrichedGames = useMemo(() => {
     if (!player || allGames.length === 0) return [];
 
-    // Sort games chronologically (oldest first) to calculate sequential Elo & Peak
     const sorted = [...allGames].sort(
       (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
     );
@@ -116,7 +110,14 @@ export default function Profile() {
 
     return allGames.map((g) => ({
       ...g,
-      stats: map.get(g.id) || { eloBefore: 1200, eloAfter: 1200, eloDiff: 0, oppEloBefore: 1200, oppEloAfter: 1200, peakElo: 1200 },
+      stats: map.get(g.id) || {
+        eloBefore: 1200,
+        eloAfter: 1200,
+        eloDiff: 0,
+        oppEloBefore: 1200,
+        oppEloAfter: 1200,
+        peakElo: 1200,
+      },
     }));
   }, [allGames, player]);
 
@@ -124,83 +125,6 @@ export default function Profile() {
   const currentGamesPage = Math.min(gamesPage, totalGamesPages);
   const startIndex = (currentGamesPage - 1) * GAMES_PER_PAGE;
   const paginatedGames = enrichedGames.slice(startIndex, startIndex + GAMES_PER_PAGE);
-
-  const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [editForm, setEditForm] = useState({
-    full_name: '',
-    bio: '',
-    phone: '',
-    lichess_username: '',
-    chesscom_username: '',
-    department: '',
-    faculty: '',
-  });
-  const [avatarUploading, setAvatarUploading] = useState(false);
-  const [showLichessModal, setShowLichessModal] = useState(false);
-  const [disconnecting, setDisconnecting] = useState(false);
-  const [showChesscomVerifyModal, setShowChesscomVerifyModal] = useState(false);
-  const [showChesscomDetailModal, setShowChesscomDetailModal] = useState(false);
-  const [disconnectingChesscom, setDisconnectingChesscom] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const isOwnProfile = authProfile?.id === id;
-
-  async function handleDisconnectChesscom() {
-    if (!player || !isOwnProfile) return;
-    setDisconnectingChesscom(true);
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ chesscom_username: null })
-        .eq('id', player.id);
-
-      if (error) throw error;
-
-      setPlayer({ ...player, chesscom_username: null });
-      setShowChesscomDetailModal(false);
-      await refreshProfile();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to disconnect Chess.com account.');
-    } finally {
-      setDisconnectingChesscom(false);
-    }
-  }
-
-  async function handleChesscomSuccess(username: string) {
-    if (!player || !isOwnProfile) return;
-    const { error } = await supabase
-      .from('profiles')
-      .update({ chesscom_username: username })
-      .eq('id', player.id);
-
-    if (!error) {
-      setPlayer({ ...player, chesscom_username: username });
-      await refreshProfile();
-    }
-  }
-
-  async function handleDisconnectLichess() {
-    if (!player || !isOwnProfile) return;
-    setDisconnecting(true);
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ lichess_username: null })
-        .eq('id', player.id);
-
-      if (error) throw error;
-
-      setPlayer({ ...player, lichess_username: null });
-      setShowLichessModal(false);
-      await refreshProfile();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to disconnect account.');
-    } finally {
-      setDisconnecting(false);
-    }
-  }
 
   useEffect(() => {
     async function fetchProfile() {
@@ -255,15 +179,19 @@ export default function Profile() {
   async function saveProfile() {
     if (!player) return;
     setSaving(true);
-    await supabase.from('profiles').update({
-      full_name: editForm.full_name,
-      bio: editForm.bio,
-      phone: editForm.phone,
-      lichess_username: editForm.lichess_username || null,
-      chesscom_username: editForm.chesscom_username || null,
-      department: editForm.department,
-      faculty: editForm.faculty,
-    }).eq('id', player.id);
+    await supabase
+      .from('profiles')
+      .update({
+        full_name: editForm.full_name,
+        bio: editForm.bio,
+        phone: editForm.phone,
+        lichess_username: editForm.lichess_username || null,
+        chesscom_username: editForm.chesscom_username || null,
+        department: editForm.department,
+        faculty: editForm.faculty,
+      })
+      .eq('id', player.id);
+
     const { data } = await supabase.from('profiles').select('*').eq('id', player.id).maybeSingle();
     setPlayer(data);
     setEditing(false);
@@ -277,9 +205,7 @@ export default function Profile() {
 
     setAvatarUploading(true);
     try {
-      const { data: existingFiles } = await supabase.storage
-        .from('avatars')
-        .list(player.id);
+      const { data: existingFiles } = await supabase.storage.from('avatars').list(player.id);
 
       if (existingFiles && existingFiles.length > 0) {
         const filesToRemove = existingFiles.map((f) => `${player.id}/${f.name}`);
@@ -309,6 +235,61 @@ export default function Profile() {
     }
   }
 
+  async function handleDisconnectLichess() {
+    if (!player || !isOwnProfile) return;
+    setDisconnecting(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ lichess_username: null })
+        .eq('id', player.id);
+
+      if (error) throw error;
+
+      setPlayer({ ...player, lichess_username: null });
+      setShowLichessModal(false);
+      await refreshProfile();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to disconnect account.');
+    } finally {
+      setDisconnecting(false);
+    }
+  }
+
+  async function handleDisconnectChesscom() {
+    if (!player || !isOwnProfile) return;
+    setDisconnectingChesscom(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ chesscom_username: null })
+        .eq('id', player.id);
+
+      if (error) throw error;
+
+      setPlayer({ ...player, chesscom_username: null });
+      setShowChesscomDetailModal(false);
+      await refreshProfile();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to disconnect Chess.com account.');
+    } finally {
+      setDisconnectingChesscom(false);
+    }
+  }
+
+  async function handleChesscomSuccess(username: string) {
+    if (!player || !isOwnProfile) return;
+    const { error } = await supabase
+      .from('profiles')
+      .update({ chesscom_username: username })
+      .eq('id', player.id);
+
+    if (!error) {
+      setPlayer({ ...player, chesscom_username: username });
+      await refreshProfile();
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -329,484 +310,80 @@ export default function Profile() {
     );
   }
 
-  const isImmortal = player.is_immortal || player.fca_id === 'FCA-ETERNAL';
-  const activeTitleKey = isImmortal ? 'FET' : player.earned_title;
-  const titleConfig = TITLE_CONFIG[activeTitleKey];
-
-  const displayAvatar = isImmortal ? (player.avatar_url || '/chisom-howell.jpeg') : player.avatar_url;
-  const displayDept = isImmortal ? (player.department && player.department !== 'FUTO Chess Association' ? player.department : 'Software Engineering') : player.department;
-  const displayFaculty = isImmortal ? (player.faculty && player.faculty !== 'FUTO' ? player.faculty : 'SICT') : player.faculty;
-  const displayBio = isImmortal
-    ? (player.bio && !player.bio.includes('founder') ? player.bio : 'A notable and remarkably skilled chess player in FCA history. Remembered for his sharp tactical mind, competitive drive, and passion for chess. Forever in our hearts.')
-    : player.bio;
-  const displayLichess = isImmortal ? (player.lichess_username || 'strengthofLSB') : player.lichess_username;
+  const displayLichess = player.is_immortal || player.fca_id === 'FCA-ETERNAL'
+    ? (player.lichess_username || 'strengthofLSB')
+    : player.lichess_username;
 
   return (
-    <div className="min-h-screen px-4 sm:px-6 pt-24 sm:pt-28 pb-12 sm:pb-16 max-w-5xl mx-auto">
-        {/* Profile Card Header */}
-        <div className="bg-surface border border-chess-border p-5 sm:p-8 rounded-lg shadow-card mb-6 sm:mb-8 flex flex-col md:flex-row items-center md:items-start gap-6">
-          {/* Avatar Container */}
-          <div className="relative group flex-shrink-0">
-            <div className="w-28 h-28 md:w-32 md:h-32 rounded-full overflow-hidden bg-[#161512] border-2 border-chess-border flex items-center justify-center relative cursor-pointer"
-              onClick={() => isOwnProfile && fileInputRef.current?.click()}>
-              {avatarUploading ? (
-                <div className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-              ) : displayAvatar ? (
-                <img src={displayAvatar} alt={player.full_name} className="w-full h-full object-cover" />
-              ) : (
-                <User className="w-14 h-14 text-text-muted" />
-              )}
-              {isOwnProfile && !avatarUploading && (
-                <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Camera className="w-6 h-6 text-white" />
-                </div>
-              )}
-            </div>
+    <div className="min-h-screen px-3 sm:px-6 pt-20 sm:pt-28 pb-12 sm:pb-16 max-w-5xl mx-auto">
+      {/* Profile Header Component */}
+      <ProfileHeader
+        player={player}
+        isOwnProfile={isOwnProfile}
+        editing={editing}
+        saving={saving}
+        avatarUploading={avatarUploading}
+        editForm={editForm}
+        setEditForm={setEditForm}
+        onStartEditing={startEditing}
+        onSaveProfile={saveProfile}
+        onCancelEditing={() => setEditing(false)}
+        onAvatarUpload={handleAvatarUpload}
+        onShowLichessModal={() => setShowLichessModal(true)}
+        onShowChesscomVerifyModal={() => setShowChesscomVerifyModal(true)}
+        onShowChesscomDetailModal={() => setShowChesscomDetailModal(true)}
+      />
 
-            {/* Title Badge */}
-            {activeTitleKey !== 'NONE' && (
-              <div className="absolute -bottom-1 -right-1">
-                <span className={`px-2.5 py-0.5 rounded text-xs tracking-wider shadow-md ${titleConfig.bg}`}>
-                  {titleConfig.tag}
-                </span>
-              </div>
-            )}
+      {/* 4 Mode Ratings Grid */}
+      <ModeRatingsGrid player={player} />
 
-            <input ref={fileInputRef} type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />
-          </div>
+      {/* Super Stats Analytics */}
+      {allGames.length > 0 && player && (
+        <PlayerStats games={allGames} playerId={player.id} />
+      )}
 
-          {/* Player Info Details */}
-          <div className="flex-1 text-center md:text-left w-full">
-            {editing ? (
-              <div className="mb-4 space-y-3">
-                <input
-                  value={editForm.full_name}
-                  onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
-                  className="input-field text-xl sm:text-2xl font-bold mb-2"
-                />
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <select
-                    value={editForm.faculty}
-                    onChange={(e) => setEditForm({ ...editForm, faculty: e.target.value, department: '' })}
-                    className="input-field text-xs w-full sm:w-1/2 cursor-pointer appearance-none"
-                  >
-                    <option value="">Select School/Faculty...</option>
-                    {FUTO_FACULTIES.map((fac) => (
-                      <option key={fac.code} value={fac.code}>{fac.code} - {fac.name}</option>
-                    ))}
-                  </select>
-                  <select
-                    value={editForm.department}
-                    onChange={(e) => setEditForm({ ...editForm, department: e.target.value })}
-                    className="input-field text-xs w-full sm:w-1/2 cursor-pointer appearance-none"
-                    disabled={!editForm.faculty}
-                  >
-                    <option value="">{editForm.faculty ? 'Select Department...' : 'First Select Faculty...'}</option>
-                    {FUTO_FACULTIES.find(f => f.code === editForm.faculty)?.departments.map((dept) => (
-                      <option key={dept} value={dept}>{dept}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            ) : (
-              <div>
-                <h1 className="font-extrabold text-2xl sm:text-3xl text-white mb-1 flex items-center justify-center md:justify-start gap-2">
-                  {player.full_name}
-                </h1>
-                <p className="text-text-muted text-xs sm:text-sm mb-3">
-                  {displayDept} · {displayFaculty}
-                </p>
-              </div>
-            )}
+      {/* Match History Table & Cards */}
+      <MatchHistoryTable
+        player={player}
+        allGames={allGames}
+        paginatedGames={paginatedGames}
+        currentGamesPage={currentGamesPage}
+        totalGamesPages={totalGamesPages}
+        startIndex={startIndex}
+        gamesPerPage={GAMES_PER_PAGE}
+        onPageChange={(page) => setGamesPage(page)}
+      />
 
-            {displayBio && !editing && (
-              <p className="text-text-muted text-xs sm:text-sm leading-relaxed mb-4 max-w-2xl">{displayBio}</p>
-            )}
+      {/* Lichess Account Interactive Popup Modal */}
+      {showLichessModal && displayLichess && (
+        <LichessAccountModal
+          username={displayLichess}
+          isOwnProfile={isOwnProfile}
+          disconnecting={disconnecting}
+          onClose={() => setShowLichessModal(false)}
+          onDisconnect={handleDisconnectLichess}
+        />
+      )}
 
-            {/* Chess Handles */}
-            <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 text-xs">
-              {editing ? (
-                <div className="w-full space-y-2">
-                  <input
-                    value={editForm.bio}
-                    onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })}
-                    placeholder="Short bio..."
-                    className="input-field text-xs"
-                  />
-                  <div className="p-3 rounded bg-[#161512] border border-chess-border text-xs">
-                    <p className="text-text-muted mb-1 font-semibold">Lichess Verification</p>
-                    <p className="text-emerald-400 font-mono mb-2">
-                      {displayLichess ? `@${displayLichess} (Verified)` : 'No Lichess Account Connected'}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => initiateLichessOAuth(`/profile/${player.id}`)}
-                      className="btn-secondary py-1.5 px-3 text-xs font-bold inline-flex items-center gap-1.5"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                      {displayLichess ? 'Reconnect Lichess via OAuth' : 'Connect Lichess via OAuth'}
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-wrap items-center gap-3">
-                  {displayLichess ? (
-                    <button
-                      type="button"
-                      onClick={() => setShowLichessModal(true)}
-                      className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-[#161512] border border-chess-border text-white text-xs font-semibold shadow-sm hover:border-primary/60 transition-all cursor-pointer active:scale-95"
-                      title="Click to view details or disconnect"
-                    >
-                      <LichessIcon className="w-4 h-4 text-white flex-shrink-0" />
-                      <span>@{displayLichess}</span>
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => isOwnProfile && initiateLichessOAuth(`/profile/${player.id}`)}
-                      className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-[#161512] border border-chess-border text-xs font-semibold transition-all shadow-sm ${
-                        isOwnProfile ? 'hover:border-primary/60 hover:text-white cursor-pointer active:scale-95' : 'cursor-default'
-                      }`}
-                    >
-                      <LichessIcon className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                      <span className="text-text-muted">
-                        Lichess: <span className="text-amber-400 font-bold">Not Connected</span>
-                      </span>
-                    </button>
-                  )}
-                  {player.chesscom_username ? (
-                    <button
-                      type="button"
-                      onClick={() => setShowChesscomDetailModal(true)}
-                      className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-[#161512] border border-chess-border text-white text-xs font-semibold shadow-sm hover:border-primary/60 transition-all cursor-pointer active:scale-95"
-                      title="Click to view details or disconnect"
-                    >
-                      <ChesscomIcon className="w-4 h-4 flex-shrink-0" />
-                      <span>@{player.chesscom_username}</span>
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => isOwnProfile && setShowChesscomVerifyModal(true)}
-                      className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-[#161512] border border-chess-border text-xs font-semibold transition-all shadow-sm ${
-                        isOwnProfile ? 'hover:border-primary/60 hover:text-white cursor-pointer active:scale-95' : 'cursor-default'
-                      }`}
-                    >
-                      <ChesscomIcon className="w-4 h-4 opacity-50 flex-shrink-0" />
-                      <span className="text-text-muted">
-                        Chess.com: <span className="text-amber-400 font-bold">Not Connected</span>
-                      </span>
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
+      {/* Chess.com Account Interactive Popup Modal */}
+      {showChesscomDetailModal && player.chesscom_username && (
+        <ChesscomAccountModal
+          username={player.chesscom_username}
+          isOwnProfile={isOwnProfile}
+          disconnecting={disconnectingChesscom}
+          onClose={() => setShowChesscomDetailModal(false)}
+          onDisconnect={handleDisconnectChesscom}
+        />
+      )}
 
-            {/* Edit Actions */}
-            {isOwnProfile && (
-              <div className="mt-5 flex justify-center md:justify-start gap-3">
-                {editing ? (
-                  <>
-                    <button onClick={saveProfile} disabled={saving} className="btn-primary py-2 px-5 text-xs">
-                      {saving ? 'Saving...' : 'Save Changes'}
-                    </button>
-                    <button onClick={() => setEditing(false)} className="btn-secondary py-2 px-5 text-xs">Cancel</button>
-                  </>
-                ) : (
-                  <button onClick={startEditing} className="btn-secondary py-2 px-4 text-xs flex items-center gap-2">
-                    <Edit3 className="w-3.5 h-3.5" /> Edit Profile
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* 4 Mode Ratings Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          {MODES.map((mode) => {
-            const elo = player[`${mode.toLowerCase()}_elo` as keyof ProfileType] as number;
-            const peak = (player[`peak_${mode.toLowerCase()}_elo` as keyof ProfileType] as number) ?? elo;
-            const games = player[`${mode.toLowerCase()}_games` as keyof ProfileType] as number;
-
-            return (
-              <div key={mode} className="bg-surface border border-chess-border p-5 rounded-lg shadow-card hover:border-primary/50 transition-colors">
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <div className="flex items-center gap-1.5">
-                    {MODE_ICONS[mode]}
-                    <span className="text-xs font-semibold text-text-muted uppercase tracking-wider">{MODE_LABELS[mode]}</span>
-                  </div>
-                  <span className="text-[10px] text-text-muted font-mono bg-[#161512] px-1.5 py-0.5 rounded border border-chess-border">
-                    {games} games
-                  </span>
-                </div>
-                <div className="text-3xl font-extrabold text-white mb-2">{elo}</div>
-                <div className="text-xs font-medium flex items-center justify-between text-text-muted pt-2 border-t border-chess-border/60">
-                  <span className="flex items-center gap-1 text-emerald-400 font-semibold">
-                    <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
-                    Peak Elo:
-                  </span>
-                  <span className="text-emerald-400 font-bold font-mono text-sm">{peak}</span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Super Stats Component */}
-        {allGames.length > 0 && player && (
-          <PlayerStats games={allGames} playerId={player.id} />
-        )}
-
-        {/* Match History Table */}
-        <div className="mb-4 flex items-center justify-between gap-2.5">
-          <div className="flex items-center gap-2.5">
-            <History className="w-5 h-5 text-primary" />
-            <h2 className="text-xl font-extrabold text-white">Match History</h2>
-          </div>
-          {allGames.length > 0 && (
-            <span className="text-xs text-text-muted font-mono">
-              Total Matches Played: <strong className="text-white">{allGames.length}</strong>
-            </span>
-          )}
-        </div>
-
-        <div className="bg-surface border border-chess-border rounded-lg shadow-card overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm whitespace-nowrap">
-              <thead>
-                <tr className="bg-[#1E1C18] border-b border-chess-border text-text-muted text-xs uppercase tracking-wider font-semibold">
-                  <th className="p-4">Date</th>
-                  <th className="p-4">Format</th>
-                  <th className="p-4">Match Opponent</th>
-                  <th className="p-4 text-center">Result</th>
-                  <th className="p-4 text-center">Elo Rating & Change</th>
-                  <th className="p-4 text-right">Event / Link</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-chess-border">
-                {paginatedGames.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="p-8 text-center text-text-muted italic">
-                      No games recorded yet.
-                    </td>
-                  </tr>
-                ) : (
-                  paginatedGames.map((game) => {
-                    const isWhite = game.white_player_id === player.id;
-                    const opponent = isWhite ? game.black_player : game.white_player;
-                    const stats = game.stats;
-
-                    const isWin = (isWhite && game.result === 1) || (!isWhite && game.result === 0);
-                    const isLoss = (isWhite && game.result === 0) || (!isWhite && game.result === 1);
-
-                    const resultColor = isWin
-                      ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-600/60'
-                      : isLoss
-                        ? 'bg-rose-950/80 text-rose-300 border border-rose-700/60'
-                        : 'bg-amber-950/80 text-amber-300 border border-amber-700/60';
-
-                    const resultLabel = isWin ? '1 - 0 WIN' : isLoss ? '0 - 1 LOSS' : '½ - ½ DRAW';
-
-                    const diffStr = stats.eloDiff > 0 ? `+${stats.eloDiff}` : `${stats.eloDiff}`;
-                    const diffColor = stats.eloDiff > 0
-                      ? 'text-emerald-400 font-bold'
-                      : stats.eloDiff < 0
-                        ? 'text-rose-400 font-bold'
-                        : 'text-text-muted font-medium';
-
-                    return (
-                      <tr key={game.id} className="hover:bg-[#2E2B27] transition-colors">
-                        <td className="p-4 text-text-muted text-xs font-mono">
-                          {new Date(game.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                        </td>
-
-                        <td className="p-4">
-                          <span className="px-2.5 py-0.5 rounded text-[11px] font-bold bg-[#161512] border border-chess-border text-text-muted uppercase tracking-wider font-mono">
-                            {game.mode}
-                          </span>
-                        </td>
-
-                        <td className="p-4">
-                          <div className="flex items-center gap-1.5 text-xs flex-wrap">
-                            <span className="text-text-muted font-medium">vs</span>
-                            <span className="font-bold text-white">{opponent?.full_name || (isWhite ? 'Black' : 'White')}</span>
-                            <span className="px-1.5 py-0.2 rounded text-[11px] font-mono font-bold bg-[#161512] border border-chess-border text-emerald-400">
-                              ({stats.oppEloBefore})
-                            </span>
-                            <span className="text-[10px] text-text-muted font-mono">({isWhite ? 'White' : 'Black'})</span>
-                          </div>
-                        </td>
-
-                        <td className="p-4 text-center">
-                          <span className={`px-2 py-0.5 rounded text-xs font-extrabold ${resultColor}`}>
-                            {resultLabel}
-                          </span>
-                        </td>
-
-                        <td className="p-4 text-center font-mono text-xs">
-                          <span className="text-white font-bold text-sm">{stats.eloAfter}</span>
-                          <span className={`ml-2 ${diffColor}`}>
-                            ({diffStr})
-                          </span>
-                        </td>
-
-                        <td className="p-4 text-right text-text-muted text-xs">
-                          <div className="flex items-center justify-end gap-2">
-                            <span className="truncate max-w-[130px] font-medium">{game.event_name.replace(/\s*\[[a-zA-Z0-9]{8,12}\]/, '')}</span>
-                            {(() => {
-                              const gId = extractLichessGameId(game);
-                              const lUrl = game.external_url || (gId ? `https://lichess.org/${gId}` : null);
-                              return lUrl ? (
-                                <a href={lUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline text-[11px] font-medium">
-                                  <span>Lichess</span>
-                                  <ExternalLink className="w-3 h-3" />
-                                </a>
-                              ) : null;
-                            })()}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* PAGINATION FOOTER */}
-          {allGames.length > 0 && (
-            <div className="bg-[#1E1C18] border-t border-chess-border p-3 px-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-text-muted">
-              <span>
-                Showing {startIndex + 1}-{Math.min(startIndex + GAMES_PER_PAGE, allGames.length)} of {allGames.length} games
-              </span>
-
-              {totalGamesPages > 1 && (
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setGamesPage((p) => Math.max(1, p - 1))}
-                    disabled={currentGamesPage === 1}
-                    className="px-3 py-1.5 rounded bg-[#161512] border border-chess-border hover:text-white disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 transition-colors cursor-pointer"
-                  >
-                    <ChevronLeft className="w-3.5 h-3.5" />
-                    <span>Prev</span>
-                  </button>
-
-                  <span className="text-xs text-white font-mono px-2">
-                    Page <strong>{currentGamesPage}</strong> of <strong>{totalGamesPages}</strong>
-                  </span>
-
-                  <button
-                    onClick={() => setGamesPage((p) => Math.min(totalGamesPages, p + 1))}
-                    disabled={currentGamesPage === totalGamesPages}
-                    className="px-3 py-1.5 rounded bg-[#161512] border border-chess-border hover:text-white disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 transition-colors cursor-pointer"
-                  >
-                    <span>Next</span>
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Lichess Account Interactive Popup Modal */}
-        {showLichessModal && player && displayLichess && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
-            <div className="glass-card p-6 max-w-sm w-full border border-chess-border text-center shadow-2xl relative">
-              <button
-                onClick={() => setShowLichessModal(false)}
-                className="absolute top-3 right-3 text-text-muted hover:text-white p-1 rounded-md cursor-pointer transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-
-              <div className="w-14 h-14 rounded-full bg-[#161512] border border-chess-border flex items-center justify-center mx-auto mb-3 shadow-lg">
-                <LichessIcon className="w-7 h-7 text-white" />
-              </div>
-
-              <h3 className="font-heading text-lg text-white mb-0.5">Lichess Account</h3>
-              <p className="text-white font-mono text-base font-bold mb-5">@{displayLichess}</p>
-
-              <div className="space-y-2.5">
-                <a
-                  href={`https://lichess.org/@/${displayLichess}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  onClick={() => setShowLichessModal(false)}
-                  className="w-full btn-primary py-3 text-xs font-bold flex items-center justify-center gap-2"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                  View Profile on Lichess.org
-                </a>
-
-                {isOwnProfile && (
-                  <button
-                    onClick={handleDisconnectLichess}
-                    disabled={disconnecting}
-                    className="w-full py-2.5 px-4 rounded-lg bg-red-950/80 border border-red-600/50 text-red-300 text-xs font-bold hover:bg-red-900 transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                  >
-                    <LogOut className="w-4 h-4" />
-                    {disconnecting ? 'Disconnecting...' : 'Disconnect Lichess Account'}
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Chess.com Account Interactive Popup Modal */}
-        {showChesscomDetailModal && player && player.chesscom_username && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
-            <div className="glass-card p-6 max-w-sm w-full border border-chess-border text-center shadow-2xl relative">
-              <button
-                onClick={() => setShowChesscomDetailModal(false)}
-                className="absolute top-3 right-3 text-text-muted hover:text-white p-1 rounded-md cursor-pointer transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-
-              <div className="w-14 h-14 rounded-full bg-[#161512] border border-chess-border flex items-center justify-center mx-auto mb-3 shadow-lg">
-                <ChesscomIcon className="w-7 h-7" />
-              </div>
-
-              <h3 className="font-heading text-lg text-white mb-0.5">Chess.com Account</h3>
-              <p className="text-white font-mono text-base font-bold mb-5">@{player.chesscom_username}</p>
-
-              <div className="space-y-2.5">
-                <a
-                  href={`https://chess.com/member/${player.chesscom_username}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  onClick={() => setShowChesscomDetailModal(false)}
-                  className="w-full btn-primary py-3 text-xs font-bold flex items-center justify-center gap-2"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                  View Profile on Chess.com
-                </a>
-
-                {isOwnProfile && (
-                  <button
-                    onClick={handleDisconnectChesscom}
-                    disabled={disconnectingChesscom}
-                    className="w-full py-2.5 px-4 rounded-lg bg-red-950/80 border border-red-600/50 text-red-300 text-xs font-bold hover:bg-red-900 transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                  >
-                    <LogOut className="w-4 h-4" />
-                    {disconnectingChesscom ? 'Disconnecting...' : 'Disconnect Chess.com Account'}
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Chess.com Account Verification Modal */}
+      {/* Chess.com Verification Modal */}
+      {showChesscomVerifyModal && isOwnProfile && (
         <ChesscomVerifyModal
           isOpen={showChesscomVerifyModal}
           onClose={() => setShowChesscomVerifyModal(false)}
           onSuccess={handleChesscomSuccess}
-          initialUsername={player?.chesscom_username}
         />
-      </div>
-    );
-  }
+      )}
+    </div>
+  );
+}
