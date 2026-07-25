@@ -93,11 +93,13 @@ export async function fetchAndPreviewArena(
   if (!res.ok) throw new Error('Failed to retrieve Lichess Arena data.');
 
   const text = await res.text();
+  // Lichess returns games most recent first; reverse to process chronologically (oldest first)
   const rawGames: RawLichessGame[] = text
     .trim()
     .split('\n')
     .filter(Boolean)
-    .map((line) => JSON.parse(line));
+    .map((line) => JSON.parse(line))
+    .reverse();
 
   const { data: profiles, error } = await supabase
     .from('profiles')
@@ -129,6 +131,18 @@ export async function fetchAndPreviewArena(
   const linkedSet = new Set<string>();
   const unlinkedSet = new Set<string>();
   let alreadyImportedCount = 0;
+
+  // Track running Elo and games played state per profile ID across sequential games in this arena
+  const runningStatsMap = new Map<string, { elo: number; games: number; peak: number }>();
+
+  function getRunningStats(p: ProfileRow, mode: GameMode) {
+    let stats = runningStatsMap.get(p.id);
+    if (!stats) {
+      stats = getModeEloAndGames(p, mode);
+      runningStatsMap.set(p.id, { ...stats });
+    }
+    return stats;
+  }
 
   for (const game of rawGames) {
     const rawWhiteName = game.players.white.user?.name;
@@ -164,8 +178,8 @@ export async function fetchAndPreviewArena(
     if (game.winner === 'white') scoreWhite = 1.0;
     else if (game.winner === 'black') scoreWhite = 0.0;
 
-    const whiteStats = getModeEloAndGames(whiteProfile, mode);
-    const blackStats = getModeEloAndGames(blackProfile, mode);
+    const whiteStats = getRunningStats(whiteProfile, mode);
+    const blackStats = getRunningStats(blackProfile, mode);
 
     const kWhite = getKFactor(whiteStats.games);
     const kBlack = getKFactor(blackStats.games);
@@ -198,6 +212,19 @@ export async function fetchAndPreviewArena(
       blackEloOld: blackStats.elo,
       blackEloNew: newB,
     });
+
+    if (!isAlreadyImported) {
+      runningStatsMap.set(whiteProfile.id, {
+        elo: newA,
+        games: whiteStats.games + 1,
+        peak: Math.max(whiteStats.peak, newA),
+      });
+      runningStatsMap.set(blackProfile.id, {
+        elo: newB,
+        games: blackStats.games + 1,
+        peak: Math.max(blackStats.peak, newB),
+      });
+    }
   }
 
   return {
@@ -211,7 +238,8 @@ export async function fetchAndPreviewArena(
 
 export async function commitArenaImport(
   games: PreviewGame[],
-  eventName: string
+  eventName: string,
+  onProgress?: (processed: number, total: number) => void
 ): Promise<ArenaImportReport> {
   const report: ArenaImportReport = {
     processedGames: 0,
@@ -219,6 +247,16 @@ export async function commitArenaImport(
     skippedUnlinkedGames: 0,
     unlinkedUsernames: [],
   };
+
+  const playableGames = games.filter(g => !g.isAlreadyImported);
+  const totalToProcess = playableGames.length;
+
+  if (onProgress) {
+    onProgress(0, totalToProcess);
+  }
+
+  // Running profile state map for all profiles updated during this commit batch
+  const runningProfilesMap = new Map<string, ProfileRow>();
 
   for (const game of games) {
     if (game.isAlreadyImported) {
@@ -251,74 +289,105 @@ export async function commitArenaImport(
       });
     }
 
-    // Update White Player stats based on mode
-    const w = game.whitePlayer;
     const mode = game.mode;
-    const updateW: Record<string, number | string> = {};
+
+    // Track/Update White Player running state
+    const w = game.whitePlayer;
+    let wProfile = runningProfilesMap.get(w.id);
+    if (!wProfile) {
+      wProfile = { ...(w as unknown as ProfileRow) };
+    }
 
     if (mode === 'RAPID') {
-      updateW.rapid_elo = game.whiteEloNew;
-      updateW.rapid_games = w.rapid_games + 1;
-      updateW.peak_rapid_elo = Math.max(w.peak_rapid_elo, game.whiteEloNew);
+      wProfile.rapid_elo = game.whiteEloNew;
+      wProfile.rapid_games += 1;
+      wProfile.peak_rapid_elo = Math.max(wProfile.peak_rapid_elo, game.whiteEloNew);
     } else if (mode === 'BULLET') {
-      updateW.bullet_elo = game.whiteEloNew;
-      updateW.bullet_games = w.bullet_games + 1;
-      updateW.peak_bullet_elo = Math.max(w.peak_bullet_elo, game.whiteEloNew);
+      wProfile.bullet_elo = game.whiteEloNew;
+      wProfile.bullet_games += 1;
+      wProfile.peak_bullet_elo = Math.max(wProfile.peak_bullet_elo, game.whiteEloNew);
     } else if (mode === 'CLASSICAL') {
-      updateW.classical_elo = game.whiteEloNew;
-      updateW.classical_games = w.classical_games + 1;
-      updateW.peak_classical_elo = Math.max(w.peak_classical_elo, game.whiteEloNew);
+      wProfile.classical_elo = game.whiteEloNew;
+      wProfile.classical_games += 1;
+      wProfile.peak_classical_elo = Math.max(wProfile.peak_classical_elo, game.whiteEloNew);
     } else {
-      updateW.blitz_elo = game.whiteEloNew;
-      updateW.blitz_games = w.blitz_games + 1;
-      updateW.peak_blitz_elo = Math.max(w.peak_blitz_elo, game.whiteEloNew);
+      wProfile.blitz_elo = game.whiteEloNew;
+      wProfile.blitz_games += 1;
+      wProfile.peak_blitz_elo = Math.max(wProfile.peak_blitz_elo, game.whiteEloNew);
     }
 
     const maxPeakW = Math.max(
-      mode === 'BLITZ' ? game.whiteEloNew : w.peak_blitz_elo,
-      mode === 'RAPID' ? game.whiteEloNew : w.peak_rapid_elo,
-      mode === 'BULLET' ? game.whiteEloNew : w.peak_bullet_elo,
-      mode === 'CLASSICAL' ? game.whiteEloNew : w.peak_classical_elo
+      wProfile.peak_blitz_elo,
+      wProfile.peak_rapid_elo,
+      wProfile.peak_bullet_elo,
+      wProfile.peak_classical_elo
     );
     const titleW = getTitleForRating(maxPeakW);
-    if (titleW !== 'NONE') updateW.earned_title = titleW;
+    if (titleW !== 'NONE') wProfile.earned_title = titleW;
 
-    await supabase.from('profiles').update(updateW).eq('id', w.id);
+    runningProfilesMap.set(w.id, wProfile);
 
-    // Update Black Player stats based on mode
+    // Track/Update Black Player running state
     const b = game.blackPlayer;
-    const updateB: Record<string, number | string> = {};
+    let bProfile = runningProfilesMap.get(b.id);
+    if (!bProfile) {
+      bProfile = { ...(b as unknown as ProfileRow) };
+    }
 
     if (mode === 'RAPID') {
-      updateB.rapid_elo = game.blackEloNew;
-      updateB.rapid_games = b.rapid_games + 1;
-      updateB.peak_rapid_elo = Math.max(b.peak_rapid_elo, game.blackEloNew);
+      bProfile.rapid_elo = game.blackEloNew;
+      bProfile.rapid_games += 1;
+      bProfile.peak_rapid_elo = Math.max(bProfile.peak_rapid_elo, game.blackEloNew);
     } else if (mode === 'BULLET') {
-      updateB.bullet_elo = game.blackEloNew;
-      updateB.bullet_games = b.bullet_games + 1;
-      updateB.peak_bullet_elo = Math.max(b.peak_bullet_elo, game.blackEloNew);
+      bProfile.bullet_elo = game.blackEloNew;
+      bProfile.bullet_games += 1;
+      bProfile.peak_bullet_elo = Math.max(bProfile.peak_bullet_elo, game.blackEloNew);
     } else if (mode === 'CLASSICAL') {
-      updateB.classical_elo = game.blackEloNew;
-      updateB.classical_games = b.classical_games + 1;
-      updateB.peak_classical_elo = Math.max(b.peak_classical_elo, game.blackEloNew);
+      bProfile.classical_elo = game.blackEloNew;
+      bProfile.classical_games += 1;
+      bProfile.peak_classical_elo = Math.max(bProfile.peak_classical_elo, game.blackEloNew);
     } else {
-      updateB.blitz_elo = game.blackEloNew;
-      updateB.blitz_games = b.blitz_games + 1;
-      updateB.peak_blitz_elo = Math.max(b.peak_blitz_elo, game.blackEloNew);
+      bProfile.blitz_elo = game.blackEloNew;
+      bProfile.blitz_games += 1;
+      bProfile.peak_blitz_elo = Math.max(bProfile.peak_blitz_elo, game.blackEloNew);
     }
 
     const maxPeakB = Math.max(
-      mode === 'BLITZ' ? game.blackEloNew : b.peak_blitz_elo,
-      mode === 'RAPID' ? game.blackEloNew : b.peak_rapid_elo,
-      mode === 'BULLET' ? game.blackEloNew : b.peak_bullet_elo,
-      mode === 'CLASSICAL' ? game.blackEloNew : b.peak_classical_elo
+      bProfile.peak_blitz_elo,
+      bProfile.peak_rapid_elo,
+      bProfile.peak_bullet_elo,
+      bProfile.peak_classical_elo
     );
     const titleB = getTitleForRating(maxPeakB);
-    if (titleB !== 'NONE') updateB.earned_title = titleB;
+    if (titleB !== 'NONE') bProfile.earned_title = titleB;
 
-    await supabase.from('profiles').update(updateB).eq('id', b.id);
+    runningProfilesMap.set(b.id, bProfile);
 
     report.processedGames++;
+
+    if (onProgress) {
+      onProgress(report.processedGames, totalToProcess);
+    }
+  }
+
+  // Commit all updated profile stats to DB
+  for (const [profileId, p] of runningProfilesMap.entries()) {
+    const updatePayload: Record<string, number | string> = {
+      blitz_elo: p.blitz_elo,
+      blitz_games: p.blitz_games,
+      peak_blitz_elo: p.peak_blitz_elo,
+      rapid_elo: p.rapid_elo,
+      rapid_games: p.rapid_games,
+      peak_rapid_elo: p.peak_rapid_elo,
+      bullet_elo: p.bullet_elo,
+      bullet_games: p.bullet_games,
+      peak_bullet_elo: p.peak_bullet_elo,
+      classical_elo: p.classical_elo,
+      classical_games: p.classical_games,
+      peak_classical_elo: p.peak_classical_elo,
+      earned_title: p.earned_title,
+    };
+    await supabase.from('profiles').update(updatePayload).eq('id', profileId);
   }
 
   if (report.processedGames > 0 && eventName) {

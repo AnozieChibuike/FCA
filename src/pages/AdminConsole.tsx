@@ -36,6 +36,7 @@ export default function AdminConsole() {
   const [alreadyImportedCount, setAlreadyImportedCount] = useState(0);
 
   const [commitReport, setCommitReport] = useState<ArenaImportReport | null>(null);
+  const [importProgress, setImportProgress] = useState<{ processed: number; total: number }>({ processed: 0, total: 0 });
 
   // OTB Logging State
   const [allProfiles, setAllProfiles] = useState<Profile[]>([]);
@@ -145,9 +146,12 @@ export default function AdminConsole() {
     setStep('confirming');
     setLoading(true);
     setError('');
+    setImportProgress({ processed: 0, total: playableGamesCount });
 
     try {
-      const report = await commitArenaImport(previewGames, eventName);
+      const report = await commitArenaImport(previewGames, eventName, (processed, total) => {
+        setImportProgress({ processed, total });
+      });
       setCommitReport(report);
       setStep('done');
       fetchHistory(); // Refresh history list after commit
@@ -169,6 +173,7 @@ export default function AdminConsole() {
     setTotalRaw(0);
     setAlreadyImportedCount(0);
     setCommitReport(null);
+    setImportProgress({ processed: 0, total: 0 });
     setError('');
   }
 
@@ -860,10 +865,48 @@ export default function AdminConsole() {
 
         {/* STEP 3: Confirming */}
         {step === 'confirming' && (
-          <div className="glass-card p-10 text-center">
-            <Loader2 className="w-12 h-12 border-2 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4" />
-            <h2 className="font-heading text-xl tracking-wider mb-2">Committing New Games</h2>
-            <p className="text-text-muted text-sm">Updating ratings and recording {playableGamesCount} new games...</p>
+          <div className="glass-card p-8 md:p-10 text-center max-w-xl mx-auto">
+            <div className="relative w-16 h-16 mx-auto mb-5 flex items-center justify-center">
+              <Loader2 className="w-16 h-16 text-primary/30 border-2 border-primary/20 rounded-full animate-spin text-primary" />
+              <span className="absolute font-mono font-bold text-xs text-primary">
+                {importProgress.total > 0
+                  ? `${Math.round((importProgress.processed / importProgress.total) * 100)}%`
+                  : '0%'}
+              </span>
+            </div>
+
+            <h2 className="font-heading text-xl md:text-2xl tracking-wider mb-2">
+              Importing Arena Games...
+            </h2>
+            <p className="text-text-muted text-xs md:text-sm mb-6">
+              Calculating sequential Elo ratings and recording games into database
+            </p>
+
+            {/* Progress Bar & Percentage */}
+            <div className="space-y-2 text-left bg-[#161512] p-4 rounded-lg border border-chess-border">
+              <div className="flex justify-between items-center text-xs font-semibold">
+                <span className="text-text-muted">
+                  Processing match {importProgress.processed} of {importProgress.total}
+                </span>
+                <span className="text-emerald-400 font-mono font-bold">
+                  {importProgress.total > 0
+                    ? `${Math.round((importProgress.processed / importProgress.total) * 100)}%`
+                    : '0%'}
+                </span>
+              </div>
+              <div className="w-full h-3 bg-[#1A1917] rounded-full overflow-hidden border border-chess-border/80 p-0.5">
+                <div
+                  className="h-full bg-gradient-to-r from-primary via-emerald-400 to-neon-green rounded-full transition-all duration-200 shadow-[0_0_12px_rgba(34,197,94,0.4)]"
+                  style={{
+                    width: `${
+                      importProgress.total > 0
+                        ? Math.min(100, Math.round((importProgress.processed / importProgress.total) * 100))
+                        : 0
+                    }%`,
+                  }}
+                />
+              </div>
+            </div>
           </div>
         )}
 
