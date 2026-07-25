@@ -65,6 +65,8 @@ export default function Profile() {
         eloBefore: number;
         eloAfter: number;
         eloDiff: number;
+        oppEloBefore: number;
+        oppEloAfter: number;
         peakElo: number;
       }
     >();
@@ -98,6 +100,8 @@ export default function Profile() {
         eloBefore: uElo,
         eloAfter: newU,
         eloDiff: diff,
+        oppEloBefore: oElo,
+        oppEloAfter: newO,
         peakElo: nextPeak,
       });
 
@@ -112,7 +116,7 @@ export default function Profile() {
 
     return allGames.map((g) => ({
       ...g,
-      stats: map.get(g.id) || { eloBefore: 1200, eloAfter: 1200, eloDiff: 0, peakElo: 1200 },
+      stats: map.get(g.id) || { eloBefore: 1200, eloAfter: 1200, eloDiff: 0, oppEloBefore: 1200, oppEloAfter: 1200, peakElo: 1200 },
     }));
   }, [allGames, player]);
 
@@ -624,9 +628,12 @@ export default function Profile() {
                         </td>
 
                         <td className="p-4">
-                          <div className="flex items-center gap-1.5 text-xs">
+                          <div className="flex items-center gap-1.5 text-xs flex-wrap">
                             <span className="text-text-muted font-medium">vs</span>
                             <span className="font-bold text-white">{opponent?.full_name || (isWhite ? 'Black' : 'White')}</span>
+                            <span className="px-1.5 py-0.2 rounded text-[11px] font-mono font-bold bg-[#161512] border border-chess-border text-emerald-400">
+                              ({stats.oppEloBefore})
+                            </span>
                             <span className="text-[10px] text-text-muted font-mono">({isWhite ? 'White' : 'Black'})</span>
                           </div>
                         </td>

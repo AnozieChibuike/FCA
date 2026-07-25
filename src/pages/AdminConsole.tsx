@@ -4,7 +4,7 @@ import {
   Swords, Upload, AlertTriangle, CheckCircle, XCircle, Loader2,
   Shield, ArrowLeft, ArrowRight, Crown,
   ExternalLink, History, RefreshCw, Check, Trophy, Calendar,
-  ChevronLeft, ChevronRight, Filter
+  ChevronLeft, ChevronRight, Filter, Sparkles
 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
@@ -31,6 +31,7 @@ export default function AdminConsole() {
   const [error, setError] = useState('');
 
   const [previewGames, setPreviewGames] = useState<PreviewGame[]>([]);
+  const [previewFilter, setPreviewFilter] = useState<'all' | 'new'>('new');
   const [linked, setLinked] = useState<string[]>([]);
   const [unlinked, setUnlinked] = useState<string[]>([]);
   const [totalRaw, setTotalRaw] = useState(0);
@@ -155,6 +156,14 @@ export default function AdminConsole() {
       setUnlinked(result.unlinkedUsernames);
       setTotalRaw(result.totalRawGames);
       setAlreadyImportedCount(result.alreadyImportedCount);
+
+      const newGamesCount = result.games.filter((g) => !g.isAlreadyImported).length;
+      if (result.alreadyImportedCount > 0 && newGamesCount > 0) {
+        setPreviewFilter('new');
+      } else {
+        setPreviewFilter('all');
+      }
+
       setStep('preview');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch arena data.');
@@ -332,6 +341,9 @@ export default function AdminConsole() {
   }
 
   const playableGamesCount = previewGames.filter(g => !g.isAlreadyImported).length;
+  const displayedPreviewGames = previewFilter === 'new'
+    ? previewGames.filter(g => !g.isAlreadyImported)
+    : previewGames;
 
   return (
     <div className="min-h-screen px-4 sm:px-6 pt-24 sm:pt-28 pb-12 sm:pb-16">
@@ -657,11 +669,22 @@ export default function AdminConsole() {
               </div>
             </div>
 
-            {alreadyImportedCount > 0 && (
+            {alreadyImportedCount > 0 && playableGamesCount > 0 && (
+              <div className="p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs mb-4 flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                  <span>
+                    <strong>New Games Detected for Newly Connected Player(s):</strong> Found <strong className="text-white">{playableGamesCount}</strong> unrecorded match(es) in this arena. The {alreadyImportedCount} previously imported match(es) will be skipped automatically.
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {alreadyImportedCount > 0 && playableGamesCount === 0 && (
               <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs mb-6 flex items-center gap-2">
                 <Check className="w-4 h-4 text-amber-400 flex-shrink-0" />
                 <span>
-                  <strong>Duplicate Protection Active:</strong> {alreadyImportedCount} game(s) in this arena were already imported previously and will be automatically skipped to prevent double rating calculations.
+                  <strong>Duplicate Protection Active:</strong> All {alreadyImportedCount} game(s) in this arena were already imported previously and will be automatically skipped to prevent double rating calculations.
                 </span>
               </div>
             )}
@@ -701,13 +724,63 @@ export default function AdminConsole() {
               )}
             </div>
 
-            {previewGames.length === 0 ? (
+            {/* Filter controls between New vs All */}
+            {alreadyImportedCount > 0 && previewGames.length > 0 && (
+              <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                <span className="text-xs font-semibold text-text-muted">
+                  Showing <strong className="text-white">{displayedPreviewGames.length}</strong> of {previewGames.length} arena matches
+                </span>
+                <div className="flex items-center gap-1 bg-[#161512] p-1 rounded-lg border border-chess-border text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewFilter('new')}
+                    className={`px-3 py-1.5 rounded font-semibold transition-colors cursor-pointer ${
+                      previewFilter === 'new' ? 'bg-primary text-black font-bold' : 'text-text-muted hover:text-white'
+                    }`}
+                  >
+                    New Unrecorded Games ({playableGamesCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewFilter('all')}
+                    className={`px-3 py-1.5 rounded font-semibold transition-colors cursor-pointer ${
+                      previewFilter === 'all' ? 'bg-primary text-black font-bold' : 'text-text-muted hover:text-white'
+                    }`}
+                  >
+                    All Games ({previewGames.length})
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {displayedPreviewGames.length === 0 ? (
               <div className="glass-card p-10 text-center">
-                <XCircle className="w-10 h-10 text-cta mx-auto mb-3" />
-                <p className="text-text-muted">No matched FCA games found in this arena.</p>
-                <button onClick={() => setStep('form')} className="btn-primary mt-4 text-sm">
-                  Try Another Arena
-                </button>
+                {alreadyImportedCount > 0 ? (
+                  <>
+                    <CheckCircle className="w-10 h-10 text-emerald-400 mx-auto mb-3" />
+                    <h3 className="text-white font-bold text-base mb-1">No New Unrecorded Games</h3>
+                    <p className="text-text-muted text-sm max-w-md mx-auto">
+                      All {alreadyImportedCount} matched game(s) in this arena have already been imported into the platform.
+                    </p>
+                    {previewFilter === 'new' && (
+                      <button
+                        type="button"
+                        onClick={() => setPreviewFilter('all')}
+                        className="btn-secondary mt-4 text-xs font-semibold cursor-pointer"
+                      >
+                        View {alreadyImportedCount} Previously Imported Games
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="w-10 h-10 text-cta mx-auto mb-3" />
+                    <p className="text-text-muted">No matched FCA games found in this arena.</p>
+                    <button onClick={() => setStep('form')} className="btn-primary mt-4 text-sm cursor-pointer">
+                      Try Another Arena
+                    </button>
+                  </>
+                )}
               </div>
             ) : (
               <div className="space-y-3">
@@ -719,7 +792,7 @@ export default function AdminConsole() {
                   <span className="w-28 text-center">Lichess Link</span>
                 </div>
 
-                {previewGames.map((game, i) => {
+                {displayedPreviewGames.map((game, i) => {
                   const whiteEloDiff = game.whiteEloNew - game.whiteEloOld;
                   const blackEloDiff = game.blackEloNew - game.blackEloOld;
 
@@ -1066,9 +1139,16 @@ export default function AdminConsole() {
                           </td>
 
                           <td className="p-3">
-                            <span className="font-medium text-white">
-                              {game.white_player?.full_name || 'White'}
-                            </span>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-medium text-white">
+                                {game.white_player?.full_name || 'White'}
+                              </span>
+                              {game.white_player && (
+                                <span className="text-[10px] font-mono text-emerald-400 font-bold bg-[#161512] px-1.5 py-0.2 rounded border border-chess-border">
+                                  ({game.white_player.blitz_elo ?? 1200})
+                                </span>
+                              )}
+                            </div>
                           </td>
 
                           <td className="p-3 text-center">
@@ -1082,9 +1162,16 @@ export default function AdminConsole() {
                           </td>
 
                           <td className="p-3">
-                            <span className="font-medium text-white">
-                              {game.black_player?.full_name || 'Black'}
-                            </span>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-medium text-white">
+                                {game.black_player?.full_name || 'Black'}
+                              </span>
+                              {game.black_player && (
+                                <span className="text-[10px] font-mono text-emerald-400 font-bold bg-[#161512] px-1.5 py-0.2 rounded border border-chess-border">
+                                  ({game.black_player.blitz_elo ?? 1200})
+                                </span>
+                              )}
+                            </div>
                           </td>
 
                           <td className="p-3 text-right">
