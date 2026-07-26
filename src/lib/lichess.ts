@@ -271,6 +271,10 @@ export async function commitArenaImport(
       result: game.result,
       source: 'LICHESS_ARENA',
       event_name: eventName,
+      white_elo_before: game.whiteEloOld,
+      white_elo_after: game.whiteEloNew,
+      black_elo_before: game.blackEloOld,
+      black_elo_after: game.blackEloNew,
       lichess_game_id: game.lichessGameId,
       external_url: game.externalUrl,
     };
@@ -278,7 +282,7 @@ export async function commitArenaImport(
     const { error: insertErr } = await supabase.from('games').insert(payloadWithExtra);
 
     if (insertErr) {
-      // Fallback if lichess_game_id or external_url columns do not exist in database table schema
+      // Fallback if extra columns failed
       await supabase.from('games').insert({
         white_player_id: game.whitePlayer.id,
         black_player_id: game.blackPlayer.id,
@@ -286,6 +290,10 @@ export async function commitArenaImport(
         result: game.result,
         source: 'LICHESS_ARENA',
         event_name: `${eventName} [${game.lichessGameId}]`,
+        white_elo_before: game.whiteEloOld,
+        white_elo_after: game.whiteEloNew,
+        black_elo_before: game.blackEloOld,
+        black_elo_after: game.blackEloNew,
       });
     }
 

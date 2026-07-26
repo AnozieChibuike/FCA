@@ -50,6 +50,142 @@ export default function AdminConsole() {
   const [otbSubmitting, setOtbSubmitting] = useState(false);
   const [otbSuccess, setOtbSuccess] = useState<string | null>(null);
 
+  // Recalculation State
+  const [recalculating, setRecalculating] = useState(false);
+  const [recalculateSuccess, setRecalculateSuccess] = useState<string | null>(null);
+
+  async function handleRecalculateAllElo() {
+    if (!window.confirm('Are you sure you want to recalculate all platform Elo ratings and peak ratings across all historical matches?')) return;
+    setRecalculating(true);
+    setRecalculateSuccess(null);
+    setError('');
+
+    try {
+      const { data: profiles, error: profErr } = await supabase.from('profiles').select('*');
+      if (profErr || !profiles) throw new Error('Failed to fetch profiles for recalculation.');
+
+      const { data: games, error: gamesErr } = await supabase
+        .from('games')
+        .select('*')
+        .order('created_at', { ascending: true });
+
+      if (gamesErr || !games) throw new Error('Failed to fetch games for recalculation.');
+
+      const profileStats = new Map<string, any>();
+
+      profiles.forEach((p: Profile) => {
+        const defaultElo = p.is_immortal ? (p.blitz_elo || 2500) : 1200;
+        profileStats.set(p.id, {
+          id: p.id,
+          is_immortal: p.is_immortal,
+          earned_title: p.earned_title || 'NONE',
+          BLITZ: { elo: defaultElo, games: 0, peak: defaultElo },
+          RAPID: { elo: p.is_immortal ? (p.rapid_elo || defaultElo) : 1200, games: 0, peak: p.is_immortal ? (p.rapid_elo || defaultElo) : 1200 },
+          BULLET: { elo: p.is_immortal ? (p.bullet_elo || defaultElo) : 1200, games: 0, peak: p.is_immortal ? (p.bullet_elo || defaultElo) : 1200 },
+          CLASSICAL: { elo: p.is_immortal ? (p.classical_elo || defaultElo) : 1200, games: 0, peak: p.is_immortal ? (p.classical_elo || defaultElo) : 1200 },
+        });
+      });
+
+      const gameUpdates: any[] = [];
+
+      for (const g of games as Game[]) {
+        const mode = g.mode || 'BLITZ';
+        const scoreW = Number(g.result);
+
+        let w = profileStats.get(g.white_player_id);
+        let b = profileStats.get(g.black_player_id);
+
+        if (!w) {
+          w = { id: g.white_player_id, is_immortal: false, earned_title: 'NONE', BLITZ: { elo: 1200, games: 0, peak: 1200 }, RAPID: { elo: 1200, games: 0, peak: 1200 }, BULLET: { elo: 1200, games: 0, peak: 1200 }, CLASSICAL: { elo: 1200, games: 0, peak: 1200 } };
+          profileStats.set(g.white_player_id, w);
+        }
+        if (!b) {
+          b = { id: g.black_player_id, is_immortal: false, earned_title: 'NONE', BLITZ: { elo: 1200, games: 0, peak: 1200 }, RAPID: { elo: 1200, games: 0, peak: 1200 }, BULLET: { elo: 1200, games: 0, peak: 1200 }, CLASSICAL: { elo: 1200, games: 0, peak: 1200 } };
+          profileStats.set(g.black_player_id, b);
+        }
+
+        const wModeStats = w[mode];
+        const bModeStats = b[mode];
+
+        const wEloOld = wModeStats.elo;
+        const bEloOld = bModeStats.elo;
+
+        const kW = getKFactor(wModeStats.games);
+        const kB = getKFactor(bModeStats.games);
+
+        const { newA: wEloNew, newB: bEloNew } = calculateElo(wEloOld, bEloOld, scoreW, kW, kB);
+
+        wModeStats.elo = wEloNew;
+        wModeStats.games += 1;
+        wModeStats.peak = Math.max(wModeStats.peak, wEloNew);
+
+        bModeStats.elo = bEloNew;
+        bModeStats.games += 1;
+        bModeStats.peak = Math.max(bModeStats.peak, bEloNew);
+
+        gameUpdates.push({
+          id: g.id,
+          white_elo_before: wEloOld,
+          white_elo_after: wEloNew,
+          black_elo_before: bEloOld,
+          black_elo_after: bEloNew,
+        });
+      }
+
+      for (const gu of gameUpdates) {
+        await supabase
+          .from('games')
+          .update({
+            white_elo_before: gu.white_elo_before,
+            white_elo_after: gu.white_elo_after,
+            black_elo_before: gu.black_elo_before,
+            black_elo_after: gu.black_elo_after,
+          })
+          .eq('id', gu.id);
+      }
+
+      for (const [profId, pStats] of profileStats.entries()) {
+        const maxPeak = Math.max(
+          pStats.BLITZ.peak,
+          pStats.RAPID.peak,
+          pStats.BULLET.peak,
+          pStats.CLASSICAL.peak
+        );
+
+        const title = getTitleForRating(maxPeak);
+
+        const updatePayload: Record<string, any> = {
+          blitz_elo: pStats.BLITZ.elo,
+          blitz_games: pStats.BLITZ.games,
+          peak_blitz_elo: pStats.BLITZ.peak,
+          rapid_elo: pStats.RAPID.elo,
+          rapid_games: pStats.RAPID.games,
+          peak_rapid_elo: pStats.RAPID.peak,
+          bullet_elo: pStats.BULLET.elo,
+          bullet_games: pStats.BULLET.games,
+          peak_bullet_elo: pStats.BULLET.peak,
+          classical_elo: pStats.CLASSICAL.elo,
+          classical_games: pStats.CLASSICAL.games,
+          peak_classical_elo: pStats.CLASSICAL.peak,
+        };
+
+        if (title !== 'NONE' && !pStats.is_immortal) {
+          updatePayload.earned_title = title;
+        }
+
+        await supabase.from('profiles').update(updatePayload).eq('id', profId);
+      }
+
+      setRecalculateSuccess(`Successfully recalculated Elo & peak ratings for ${games.length} games across ${profiles.length} player profiles!`);
+      fetchProfiles();
+      fetchHistory();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to recalculate platform Elo ratings.');
+    } finally {
+      setRecalculating(false);
+    }
+  }
+
   // Imported History State
   const [historyGames, setHistoryGames] = useState<Game[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
@@ -257,6 +393,10 @@ export default function AdminConsole() {
         source: 'OTB_MANUAL',
         is_official: true,
         event_name: otbEventName,
+        white_elo_before: wStats.elo,
+        white_elo_after: newA,
+        black_elo_before: bStats.elo,
+        black_elo_after: newB,
       });
 
       if (gameErr) throw gameErr;
@@ -388,7 +528,28 @@ export default function AdminConsole() {
             <Calendar className="w-4 h-4 text-primary" />
             <span>Schedule Tournament</span>
           </button>
+
+          <button
+            type="button"
+            onClick={handleRecalculateAllElo}
+            disabled={recalculating}
+            className="px-4 sm:px-5 py-2.5 min-h-[44px] rounded-lg text-xs sm:text-sm font-bold bg-[#161512] text-emerald-400 border border-emerald-500/40 hover:border-emerald-400 flex items-center justify-center gap-2 transition-all cursor-pointer select-none active:scale-[0.98] disabled:opacity-50"
+          >
+            {recalculating ? (
+              <Loader2 className="w-4 h-4 text-emerald-400 animate-spin" />
+            ) : (
+              <RefreshCw className="w-4 h-4 text-emerald-400" />
+            )}
+            <span>{recalculating ? 'Recalculating...' : 'Recalculate All Ratings'}</span>
+          </button>
         </div>
+
+        {recalculateSuccess && (
+          <div className="flex items-center gap-2 p-3.5 rounded-lg bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 text-xs sm:text-sm mb-6 leading-relaxed">
+            <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+            <span>{recalculateSuccess}</span>
+          </div>
+        )}
 
         {error && (
           <div className="flex items-center gap-2 p-3 rounded-lg bg-cta/10 border border-cta/20 text-cta text-sm mb-6">

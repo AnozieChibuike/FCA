@@ -184,6 +184,10 @@ CREATE TABLE games (
     is_official BOOLEAN DEFAULT TRUE,
     source TEXT NOT NULL,
     event_name TEXT NOT NULL,
+    white_elo_before INT,
+    white_elo_after INT,
+    black_elo_before INT,
+    black_elo_after INT,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

@@ -85,27 +85,33 @@ export default function Profile() {
       const kU = getKFactor(uGames);
       const kO = getKFactor(oGames);
 
-      const { newA: newU, newB: newO } = calculateElo(uElo, oElo, scoreU, kU, kO);
+      const { newA: calcNewU, newB: calcNewO } = calculateElo(uElo, oElo, scoreU, kU, kO);
 
-      const diff = newU - uElo;
-      const nextPeak = Math.max(uPeak, newU);
+      const eloBefore = isWhite ? (g.white_elo_before ?? uElo) : (g.black_elo_before ?? uElo);
+      const eloAfter = isWhite ? (g.white_elo_after ?? calcNewU) : (g.black_elo_after ?? calcNewU);
+      const eloDiff = eloAfter - eloBefore;
+
+      const oppEloBefore = isWhite ? (g.black_elo_before ?? oElo) : (g.white_elo_before ?? oElo);
+      const oppEloAfter = isWhite ? (g.black_elo_after ?? calcNewO) : (g.white_elo_after ?? calcNewO);
+
+      const nextPeak = Math.max(uPeak, eloAfter);
 
       map.set(g.id, {
-        eloBefore: uElo,
-        eloAfter: newU,
-        eloDiff: diff,
-        oppEloBefore: oElo,
-        oppEloAfter: newO,
+        eloBefore,
+        eloAfter,
+        eloDiff,
+        oppEloBefore,
+        oppEloAfter,
         peakElo: nextPeak,
       });
 
-      runningElo[modeKey] = newU;
+      runningElo[modeKey] = eloAfter;
       runningGamesCount[modeKey] = uGames + 1;
       runningPeak[modeKey] = nextPeak;
 
-      runningElo[oppModeKey] = newO;
+      runningElo[oppModeKey] = oppEloAfter;
       runningGamesCount[oppModeKey] = oGames + 1;
-      runningPeak[oppModeKey] = Math.max(runningPeak[oppModeKey] ?? oElo, newO);
+      runningPeak[oppModeKey] = Math.max(runningPeak[oppModeKey] ?? oppEloBefore, oppEloAfter);
     }
 
     return allGames.map((g) => ({

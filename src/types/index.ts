@@ -47,6 +47,10 @@ export interface Game {
   is_official: boolean;
   source: string;
   event_name: string;
+  white_elo_before?: number | null;
+  white_elo_after?: number | null;
+  black_elo_before?: number | null;
+  black_elo_after?: number | null;
   lichess_game_id?: string | null;
   external_url?: string | null;
   created_at: string;
