@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  Users, Swords, Trophy, Zap, ArrowRight, Crown, GraduationCap, User, Sparkles
+  Users, Swords, Trophy, Zap, ArrowRight, Crown, GraduationCap, User
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import fcaLogo from '../assets/logo.png';
