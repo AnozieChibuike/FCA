@@ -54,7 +54,13 @@ export default function Leaderboards() {
     if (!loading && pendingScrollToMyRank && profile) {
       setPendingScrollToMyRank(false);
       const scrollToTarget = () => {
-        const el = document.getElementById(`leaderboard-row-${profile.id}`) || document.getElementById(`leaderboard-card-${profile.id}`);
+        const cardEl = document.getElementById(`leaderboard-card-${profile.id}`);
+        const rowEl = document.getElementById(`leaderboard-row-${profile.id}`);
+        
+        // On mobile (<768px), prioritize card element; otherwise prioritize row element
+        const isMobile = window.innerWidth < 768;
+        const el = isMobile ? (cardEl || rowEl) : (rowEl || cardEl);
+
         if (el) {
           el.scrollIntoView({ behavior: 'smooth', block: 'center' });
           el.classList.add('ring-2', 'ring-primary', 'ring-offset-2', 'ring-offset-[#161512]', 'transition-all');
@@ -66,7 +72,7 @@ export default function Leaderboards() {
 
       // Allow DOM to settle before scrolling
       requestAnimationFrame(() => {
-        setTimeout(scrollToTarget, 100);
+        setTimeout(scrollToTarget, 150);
       });
     }
   }, [loading, pendingScrollToMyRank, profile]);
