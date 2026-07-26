@@ -3,6 +3,7 @@ export type GameMode = 'BLITZ' | 'RAPID' | 'BULLET' | 'CLASSICAL';
 export type InviteRole = 'ADMIN' | 'ARBITER';
 export type PlayerStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 export type UserRole = 'ADMIN' | 'ARBITER' | 'PLAYER';
+export type Gender = 'MALE' | 'FEMALE';
 
 export interface Profile {
   id: string;
@@ -12,6 +13,8 @@ export interface Profile {
   department: string;
   faculty: string;
   phone: string | null;
+  gender?: Gender | string | null;
+  is_alumni?: boolean;
   bio: string;
   avatar_url: string | null;
   lichess_username: string | null;

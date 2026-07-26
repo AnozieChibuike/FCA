@@ -24,6 +24,8 @@ export default function Login() {
   const [regNumber, setRegNumber] = useState('');
   const [department, setDepartment] = useState('');
   const [faculty, setFaculty] = useState('');
+  const [gender, setGender] = useState('');
+  const [isAlumni, setIsAlumni] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -69,6 +71,8 @@ export default function Login() {
         reg_number: regNumber,
         department,
         faculty,
+        gender: gender || null,
+        is_alumni: isAlumni,
         fca_id: fcaId,
       };
 
@@ -227,6 +231,32 @@ export default function Login() {
                   required
                 />
               </div>
+              <div>
+                <label className="block text-xs font-semibold text-white uppercase tracking-wider mb-1">Gender (Optional)</label>
+                <select
+                  value={gender}
+                  onChange={(e) => setGender(e.target.value)}
+                  className="input-field cursor-pointer appearance-none"
+                >
+                  <option value="">Prefer not to say / Unspecified</option>
+                  <option value="MALE">Male</option>
+                  <option value="FEMALE">Female</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2.5 pt-1">
+                <input
+                  type="checkbox"
+                  id="isAlumni"
+                  checked={isAlumni}
+                  onChange={(e) => setIsAlumni(e.target.checked)}
+                  className="w-4 h-4 rounded bg-surface border-chess-border text-primary focus:ring-primary cursor-pointer"
+                />
+                <label htmlFor="isAlumni" className="text-xs font-semibold text-white cursor-pointer select-none">
+                  🎓 I am a FUTO Alumni
+                </label>
+              </div>
+
               <div>
                 <label className="block text-xs font-semibold text-white uppercase tracking-wider mb-1">Email Address</label>
                 <input

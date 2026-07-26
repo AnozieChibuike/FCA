@@ -1,11 +1,21 @@
 import { useEffect, useState } from 'react';
-import { Search, Star, User, Target } from 'lucide-react';
+import {
+  Search, Star, User, Target, Zap, Clock, Flame, Shield,
+  Trophy, Crown, Swords, Building, Filter, GraduationCap
+} from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import { TITLE_CONFIG, MODE_LABELS, type Profile, type GameMode, type LeaderboardEntry } from '../types';
 
 const MODES: GameMode[] = ['BLITZ', 'RAPID', 'BULLET', 'CLASSICAL'];
+
+const MODE_ICONS: Record<GameMode, React.ReactNode> = {
+  BLITZ: <Zap className="w-3.5 h-3.5 text-amber-400" />,
+  RAPID: <Clock className="w-3.5 h-3.5 text-blue-400" />,
+  BULLET: <Flame className="w-3.5 h-3.5 text-rose-500" />,
+  CLASSICAL: <Shield className="w-3.5 h-3.5 text-emerald-400" />,
+};
 
 export default function Leaderboards() {
   const navigate = useNavigate();
@@ -14,6 +24,8 @@ export default function Leaderboards() {
   const [players, setPlayers] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const [genderFilter, setGenderFilter] = useState<'ALL' | 'FEMALE' | 'MALE' | 'ALUMNI'>('ALL');
+
   const [searchQuery, setSearchQuery] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('');
   const [facultyFilter, setFacultyFilter] = useState('');
@@ -21,37 +33,43 @@ export default function Leaderboards() {
   const [departments, setDepartments] = useState<string[]>([]);
   const [faculties, setFaculties] = useState<string[]>([]);
 
+  const [pendingScrollToMyRank, setPendingScrollToMyRank] = useState(false);
+
   const myEntry = players.find((e) => profile && e.player.id === profile.id);
 
   const jumpToMyPosition = () => {
     if (!profile) return;
-
-    if (!myEntry && (searchQuery || departmentFilter || facultyFilter)) {
+    
+    // Reset filters if active to ensure profile is in dataset
+    if (searchQuery || departmentFilter || facultyFilter || genderFilter !== 'ALL') {
       setSearchQuery('');
       setDepartmentFilter('');
       setFacultyFilter('');
-      setTimeout(() => {
-        const el = document.getElementById(`leaderboard-row-${profile.id}`);
+      setGenderFilter('ALL');
+    }
+    setPendingScrollToMyRank(true);
+  };
+
+  useEffect(() => {
+    if (!loading && pendingScrollToMyRank && profile) {
+      setPendingScrollToMyRank(false);
+      const scrollToTarget = () => {
+        const el = document.getElementById(`leaderboard-row-${profile.id}`) || document.getElementById(`leaderboard-card-${profile.id}`);
         if (el) {
           el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          el.classList.add('ring-2', 'ring-primary', 'ring-offset-2', 'ring-offset-[#161512]');
+          el.classList.add('ring-2', 'ring-primary', 'ring-offset-2', 'ring-offset-[#161512]', 'transition-all');
           setTimeout(() => {
             el.classList.remove('ring-2', 'ring-primary', 'ring-offset-2', 'ring-offset-[#161512]');
           }, 2500);
         }
-      }, 350);
-      return;
-    }
+      };
 
-    const el = document.getElementById(`leaderboard-row-${profile.id}`);
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      el.classList.add('ring-2', 'ring-primary', 'ring-offset-2', 'ring-offset-[#161512]');
-      setTimeout(() => {
-        el.classList.remove('ring-2', 'ring-primary', 'ring-offset-2', 'ring-offset-[#161512]');
-      }, 2500);
+      // Allow DOM to settle before scrolling
+      requestAnimationFrame(() => {
+        setTimeout(scrollToTarget, 100);
+      });
     }
-  };
+  }, [loading, pendingScrollToMyRank, profile]);
 
   useEffect(() => {
     async function fetchLeaderboard() {
@@ -62,6 +80,14 @@ export default function Leaderboards() {
         .eq('status', 'APPROVED')
         .order('is_immortal', { ascending: false })
         .order(`${mode.toLowerCase()}_elo`, { ascending: false });
+
+      if (genderFilter === 'FEMALE') {
+        query = query.eq('gender', 'FEMALE');
+      } else if (genderFilter === 'MALE') {
+        query = query.eq('gender', 'MALE');
+      } else if (genderFilter === 'ALUMNI') {
+        query = query.eq('is_alumni', true);
+      }
 
       if (departmentFilter) {
         query = query.eq('department', departmentFilter);
@@ -98,7 +124,7 @@ export default function Leaderboards() {
       fetchLeaderboard();
     }, 300);
     return () => clearTimeout(timeoutId);
-  }, [mode, departmentFilter, facultyFilter, searchQuery]);
+  }, [mode, genderFilter, departmentFilter, facultyFilter, searchQuery]);
 
   useEffect(() => {
     async function fetchFilters() {
@@ -113,32 +139,57 @@ export default function Leaderboards() {
     fetchFilters();
   }, []);
 
-  const getRankIcon = (rank: number) => {
-    if (rank === 0) return <Star className="w-4 h-4 text-purple-400 fill-purple-400" />;
-    if (rank === 1) return <span className="text-yellow-400 font-bold text-base">1</span>;
-    if (rank === 2) return <span className="text-gray-300 font-bold text-base">2</span>;
-    if (rank === 3) return <span className="text-amber-600 font-bold text-base">3</span>;
-    return <span className="text-text-muted font-semibold text-sm">{rank}</span>;
+  const getRankBadge = (rank: number) => {
+    if (rank === 0) return <Star className="w-4 h-4 text-purple-400 fill-purple-400 animate-pulse mx-auto" />;
+    if (rank === 1) return <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/40 text-xs font-black mx-auto">1</span>;
+    if (rank === 2) return <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-400/20 text-slate-300 border border-slate-400/40 text-xs font-black mx-auto">2</span>;
+    if (rank === 3) return <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-700/20 text-amber-500 border border-amber-600/40 text-xs font-black mx-auto">3</span>;
+    return <span className="text-text-muted font-bold text-xs">#{rank}</span>;
+  };
+
+  const getEloColorClass = (rank: number, isImmortal: boolean) => {
+    if (isImmortal || rank === 0) {
+      return 'text-purple-400 font-extrabold text-lg sm:text-xl drop-shadow-[0_0_8px_rgba(192,132,252,0.5)]';
+    }
+    if (rank === 1) {
+      return 'text-yellow-400 font-black text-xl sm:text-2xl drop-shadow-[0_0_10px_rgba(250,204,21,0.6)]';
+    }
+    if (rank === 2) {
+      return 'text-slate-200 font-black text-lg sm:text-xl drop-shadow-[0_0_8px_rgba(226,232,240,0.5)]';
+    }
+    if (rank === 3) {
+      return 'text-amber-500 font-black text-lg sm:text-xl drop-shadow-[0_0_8px_rgba(245,158,11,0.5)]';
+    }
+    return 'text-primary font-bold text-lg';
   };
 
   return (
-    <div className="min-h-screen px-4 sm:px-6 pt-24 sm:pt-28 pb-12 sm:pb-16">
+    <div className="min-h-screen px-3 sm:px-6 pt-20 sm:pt-28 pb-12 sm:pb-16">
       <div className="max-w-6xl mx-auto">
 
         {/* Header Area */}
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-5 mb-6 sm:mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
-            <div className="flex items-center gap-3 flex-wrap mb-1.5">
-              <h1 className="text-2xl sm:text-4xl font-extrabold text-white">Global Rankings</h1>
+            <div className="flex items-center gap-2.5 flex-wrap mb-1">
+              <h1 className="text-2xl sm:text-4xl font-extrabold text-white flex items-center gap-2">
+                <Trophy className="w-6 h-6 sm:w-8 sm:h-8 text-primary shrink-0" />
+                <span>Global Rankings</span>
+              </h1>
               {profile && (
                 <button
                   onClick={jumpToMyPosition}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-primary/10 border border-primary/40 text-primary hover:bg-primary hover:text-black transition-all cursor-pointer shadow-sm active:scale-95"
                   title="Scroll directly to your rank on the leaderboard"
                 >
-                  <Target className="w-3.5 h-3.5" />
+                  <Target className="w-3.5 h-3.5 shrink-0" />
                   <span>
-                    {myEntry ? `My Rank: #${myEntry.rank}` : 'Jump to My Rank'}
+                    {myEntry
+                      ? myEntry.rank === 0
+                        ? 'My Rank: Immortal ⭐'
+                        : `My Rank: #${myEntry.rank}`
+                      : profile.status === 'PENDING'
+                      ? 'Rank: Pending Approval'
+                      : 'Jump to My Rank'}
                   </span>
                 </button>
               )}
@@ -146,26 +197,75 @@ export default function Leaderboards() {
             <p className="text-text-muted text-xs sm:text-sm">Real-time Elo tracking across all verified FCA formats.</p>
           </div>
 
-          {/* Game Modes Segmented Selector */}
-          <div className="flex bg-[#161512] border border-chess-border p-1 rounded-lg w-full sm:w-auto overflow-x-auto no-scrollbar">
+          {/* Game Modes Selector */}
+          <div className="grid grid-cols-2 sm:flex bg-[#161512] border border-chess-border p-1 rounded-lg w-full sm:w-auto gap-1">
             {MODES.map((m) => (
               <button
                 key={m}
                 onClick={() => setMode(m)}
-                className={`flex-1 sm:flex-initial px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-md text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap min-h-[40px] flex items-center justify-center select-none active:scale-95
+                className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-md text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap min-h-[38px] flex items-center justify-center gap-1.5 select-none active:scale-95
                   ${mode === m
                     ? 'bg-primary text-white shadow-sm'
                     : 'text-text-muted hover:text-white hover:bg-[#262421]'
                   }`}
               >
-                {MODE_LABELS[m]}
+                {MODE_ICONS[m]}
+                <span>{MODE_LABELS[m]}</span>
               </button>
             ))}
           </div>
         </div>
 
+        {/* Category Tabs: General / Female Category / Male Category */}
+        <div className="flex items-center gap-2 mb-4 overflow-x-auto no-scrollbar pb-1">
+          <button
+            onClick={() => setGenderFilter('ALL')}
+            className={`px-3.5 py-2 rounded-lg text-xs sm:text-sm font-extrabold transition-all cursor-pointer flex items-center gap-2 select-none active:scale-95 shrink-0 ${
+              genderFilter === 'ALL'
+                ? 'bg-primary text-black shadow-md'
+                : 'bg-surface text-text-muted border border-chess-border hover:text-white'
+            }`}
+          >
+            <Trophy className="w-3.5 h-3.5 shrink-0" />
+            <span>General Leaderboard</span>
+          </button>
+          <button
+            onClick={() => setGenderFilter('FEMALE')}
+            className={`px-3.5 py-2 rounded-lg text-xs sm:text-sm font-extrabold transition-all cursor-pointer flex items-center gap-2 select-none active:scale-95 shrink-0 ${
+              genderFilter === 'FEMALE'
+                ? 'bg-rose-600 text-white shadow-md shadow-rose-900/40'
+                : 'bg-surface text-rose-300/80 border border-rose-900/40 hover:text-rose-300 hover:border-rose-600/60'
+            }`}
+          >
+            <Crown className="w-3.5 h-3.5 text-rose-300 shrink-0" />
+            <span>Female Category</span>
+          </button>
+          <button
+            onClick={() => setGenderFilter('MALE')}
+            className={`px-3.5 py-2 rounded-lg text-xs sm:text-sm font-extrabold transition-all cursor-pointer flex items-center gap-2 select-none active:scale-95 shrink-0 ${
+              genderFilter === 'MALE'
+                ? 'bg-sky-600 text-white shadow-md shadow-sky-900/40'
+                : 'bg-surface text-sky-300/80 border border-sky-900/40 hover:text-sky-300 hover:border-sky-600/60'
+            }`}
+          >
+            <Swords className="w-3.5 h-3.5 text-sky-300 shrink-0" />
+            <span>Male Category</span>
+          </button>
+          <button
+            onClick={() => setGenderFilter('ALUMNI')}
+            className={`px-3.5 py-2 rounded-lg text-xs sm:text-sm font-extrabold transition-all cursor-pointer flex items-center gap-2 select-none active:scale-95 shrink-0 ${
+              genderFilter === 'ALUMNI'
+                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-900/40'
+                : 'bg-surface text-emerald-300/80 border border-emerald-900/40 hover:text-emerald-300 hover:border-emerald-600/60'
+            }`}
+          >
+            <GraduationCap className="w-3.5 h-3.5 text-emerald-300 shrink-0" />
+            <span>Alumni Category</span>
+          </button>
+        </div>
+
         {/* Filters Row */}
-        <div className="flex flex-col md:flex-row gap-3 mb-6">
+        <div className="flex flex-col md:flex-row gap-2.5 sm:gap-3 mb-6">
           <div className="relative flex-1">
             <Search className="w-4 h-4 text-text-muted absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
@@ -173,54 +273,160 @@ export default function Leaderboards() {
               placeholder="Search player by name..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-surface border border-chess-border rounded-md pl-10 pr-4 py-2.5 min-h-[44px] text-base sm:text-sm text-white
+              className="w-full bg-surface border border-chess-border rounded-md pl-10 pr-4 py-2.5 min-h-[42px] text-sm text-white
                          focus:outline-none focus:border-primary transition-colors placeholder:text-text-muted"
             />
           </div>
 
-          <div className="flex-1 md:max-w-xs relative">
-            <select
-              value={departmentFilter}
-              onChange={(e) => setDepartmentFilter(e.target.value)}
-              className="w-full bg-surface border border-chess-border rounded-md px-4 py-2.5 min-h-[44px] text-base sm:text-sm text-white
-                         focus:outline-none focus:border-primary transition-colors cursor-pointer appearance-none"
-            >
-              <option value="">All Departments</option>
-              {departments.map((dept) => (
-                <option key={dept} value={dept}>{dept}</option>
-              ))}
-            </select>
-            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-text-muted text-xs">
-              ▼
+          <div className="flex flex-row gap-2.5 flex-1">
+            <div className="flex-1 relative">
+              <select
+                value={departmentFilter}
+                onChange={(e) => setDepartmentFilter(e.target.value)}
+                className="w-full bg-surface border border-chess-border rounded-md pl-8 pr-7 py-2.5 min-h-[42px] text-xs sm:text-sm text-white
+                           focus:outline-none focus:border-primary transition-colors cursor-pointer appearance-none truncate"
+              >
+                <option value="">All Depts</option>
+                {departments.map((dept) => (
+                  <option key={dept} value={dept}>{dept}</option>
+                ))}
+              </select>
+              <Building className="w-3.5 h-3.5 text-text-muted absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-text-muted text-[10px]">
+                ▼
+              </div>
             </div>
-          </div>
 
-          <div className="flex-1 md:max-w-xs relative">
-            <select
-              value={facultyFilter}
-              onChange={(e) => setFacultyFilter(e.target.value)}
-              className="w-full bg-surface border border-chess-border rounded-md px-4 py-2.5 min-h-[44px] text-base sm:text-sm text-white
-                         focus:outline-none focus:border-primary transition-colors cursor-pointer appearance-none"
-            >
-              <option value="">All Faculties</option>
-              {faculties.map((fac) => (
-                <option key={fac} value={fac}>{fac}</option>
-              ))}
-            </select>
-            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-text-muted text-xs">
-              ▼
+            <div className="flex-1 relative">
+              <select
+                value={facultyFilter}
+                onChange={(e) => setFacultyFilter(e.target.value)}
+                className="w-full bg-surface border border-chess-border rounded-md pl-8 pr-7 py-2.5 min-h-[42px] text-xs sm:text-sm text-white
+                           focus:outline-none focus:border-primary transition-colors cursor-pointer appearance-none truncate"
+              >
+                <option value="">All Faculties</option>
+                {faculties.map((fac) => (
+                  <option key={fac} value={fac}>{fac}</option>
+                ))}
+              </select>
+              <Filter className="w-3.5 h-3.5 text-text-muted absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-text-muted text-[10px]">
+                ▼
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Table Container */}
-        <div className="bg-surface border border-chess-border rounded-lg shadow-card overflow-hidden">
+        {/* Mobile View: Card List (< md) */}
+        <div className="block md:hidden space-y-2.5 mb-6">
+          {loading ? (
+            <div className="p-10 text-center bg-surface border border-chess-border rounded-lg">
+              <div className="w-7 h-7 border-2 border-primary/30 border-t-primary rounded-full animate-spin mx-auto" />
+            </div>
+          ) : players.length === 0 ? (
+            <div className="p-10 text-center text-text-muted bg-surface border border-chess-border rounded-lg text-sm">
+              No players found for this filter.
+            </div>
+          ) : (
+            players.map((entry) => {
+              const player = entry.player;
+              const isCurrentUser = profile?.id === player.id;
+              const isImmortal = player.is_immortal || player.fca_id === 'FCA-ETERNAL';
+              const activeTitleKey = isImmortal ? 'FET' : player.earned_title;
+              const titleConfig = TITLE_CONFIG[activeTitleKey];
+
+              const avatarUrl = isImmortal ? (player.avatar_url || '/chisom-howell.jpeg') : player.avatar_url;
+              const department = isImmortal ? 'Software Eng.' : (player.department || '-');
+
+              return (
+                <div
+                  key={player.id}
+                  id={`leaderboard-card-${player.id}`}
+                  onClick={() => navigate(`/profile/${player.id}`)}
+                  className={`p-3.5 rounded-xl border transition-all cursor-pointer relative active:scale-[0.99] ${
+                    isCurrentUser
+                      ? 'bg-primary/10 border-primary shadow-[0_0_15px_rgba(234,179,8,0.15)] ring-1 ring-primary'
+                      : 'bg-surface border-chess-border hover:border-primary/40'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    {/* Left: Rank + Avatar + Name */}
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className="w-6 shrink-0 text-center">
+                        {getRankBadge(entry.rank)}
+                      </div>
+
+                      <div className={`w-10 h-10 rounded-full overflow-hidden bg-[#161512] border shrink-0 flex items-center justify-center ${
+                        isCurrentUser ? 'border-primary shadow-[0_0_8px_rgba(234,179,8,0.3)]' : 'border-chess-border'
+                      }`}>
+                        {avatarUrl ? (
+                          <img src={avatarUrl} alt={player.full_name} className="w-full h-full object-cover" />
+                        ) : (
+                          <User className="w-4.5 h-4.5 text-text-muted" />
+                        )}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-bold text-white text-sm truncate max-w-[130px] sm:max-w-[200px]">
+                            {player.full_name}
+                          </span>
+                          {isCurrentUser && (
+                            <span className="px-1.5 py-0.2 rounded text-[9px] font-black tracking-wider bg-primary text-black uppercase font-mono shadow-sm">
+                              YOU
+                            </span>
+                          )}
+                          {player.is_alumni && (
+                            <span className="px-1.5 py-0.2 rounded text-[9px] font-black tracking-wider bg-emerald-950/80 text-emerald-300 border border-emerald-500/50 inline-flex items-center gap-0.5 shadow-sm">
+                              🎓 ALUMNI
+                            </span>
+                          )}
+                          {activeTitleKey !== 'NONE' && (
+                            <span className={`px-1.5 py-0.2 rounded text-[9px] tracking-wider font-extrabold ${titleConfig.bg}`}>
+                              {titleConfig.tag}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2 mt-0.5 text-xs text-text-muted flex-wrap">
+                          <span className="truncate max-w-[110px]">{department}</span>
+                          <span>•</span>
+                          {player.gender === 'FEMALE' ? (
+                            <span className="text-[10px] font-bold text-rose-300 inline-flex items-center gap-0.5">♀ Female</span>
+                          ) : player.gender === 'MALE' ? (
+                            <span className="text-[10px] font-bold text-sky-300 inline-flex items-center gap-0.5">♂ Male</span>
+                          ) : (
+                            <span className="text-[10px] text-text-muted opacity-50">-</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right: Elo Rating */}
+                    <div className="text-right shrink-0">
+                      <div className={`tracking-tight ${getEloColorClass(entry.rank, isImmortal)}`}>
+                        {isImmortal ? '3000+' : entry.elo}
+                      </div>
+                      <div className="text-[10px] text-text-muted font-medium font-mono">
+                        {isImmortal ? '∞ games' : `${entry.games} games`}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Desktop View: Full 7-column Table (>= md) */}
+        <div className="hidden md:block bg-surface border border-chess-border rounded-lg shadow-card overflow-hidden">
           <div className="overflow-x-auto no-scrollbar">
             <table className="w-full text-left text-xs sm:text-sm whitespace-nowrap">
               <thead>
                 <tr className="bg-[#1E1C18] border-b border-chess-border text-text-muted text-xs uppercase tracking-wider font-semibold">
-                  <th className="p-3 sm:p-4 w-12 sm:w-16 text-center">Rank</th>
+                  <th className="p-3 sm:p-4 w-14 text-center">Rank</th>
                   <th className="p-3 sm:p-4">Player</th>
+                  <th className="p-4 text-center">Gender</th>
                   <th className="p-4 text-center">Platforms</th>
                   <th className="p-4">Dept / Faculty</th>
                   <th className="p-4 text-center">Games</th>
@@ -230,13 +436,13 @@ export default function Leaderboards() {
               <tbody className="divide-y divide-chess-border">
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="p-10 text-center">
+                    <td colSpan={7} className="p-10 text-center">
                       <div className="w-7 h-7 border-2 border-primary/30 border-t-primary rounded-full animate-spin mx-auto" />
                     </td>
                   </tr>
                 ) : players.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="p-10 text-center text-text-muted">
+                    <td colSpan={7} className="p-10 text-center text-text-muted">
                       No players found for this filter.
                     </td>
                   </tr>
@@ -266,7 +472,7 @@ export default function Leaderboards() {
                       >
                         <td className="p-4 text-center align-middle">
                           <div className="flex justify-center">
-                            {getRankIcon(entry.rank)}
+                            {getRankBadge(entry.rank)}
                           </div>
                         </td>
 
@@ -290,6 +496,11 @@ export default function Leaderboards() {
                                     YOU
                                   </span>
                                 )}
+                                {player.is_alumni && (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-extrabold tracking-wider bg-emerald-950/80 text-emerald-300 border border-emerald-500/50 inline-flex items-center gap-1 shadow-sm">
+                                    🎓 ALUMNI
+                                  </span>
+                                )}
                                 {activeTitleKey !== 'NONE' && (
                                   <span className={`px-2 py-0.5 rounded text-[10px] tracking-wider ${titleConfig.bg}`}>
                                     {titleConfig.tag}
@@ -301,6 +512,20 @@ export default function Leaderboards() {
                               </p>
                             </div>
                           </div>
+                        </td>
+
+                        <td className="p-4 align-middle text-center">
+                          {player.gender === 'FEMALE' ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-950/90 text-rose-300 border border-rose-500/60 inline-flex items-center gap-1 shadow-sm">
+                              ♀ Female
+                            </span>
+                          ) : player.gender === 'MALE' ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-sky-950/90 text-sky-300 border border-sky-500/60 inline-flex items-center gap-1 shadow-sm">
+                              ♂ Male
+                            </span>
+                          ) : (
+                            <span className="text-xs text-text-muted opacity-40">-</span>
+                          )}
                         </td>
 
                         <td className="p-4 align-middle text-center">
@@ -342,8 +567,7 @@ export default function Leaderboards() {
                         </td>
 
                         <td className="p-4 align-middle text-right">
-                          <span className={`font-bold text-lg tracking-tight
-                            ${isImmortal ? 'text-purple-400' : 'text-primary'}`}>
+                          <span className={`tracking-tight ${getEloColorClass(entry.rank, isImmortal)}`}>
                             {isImmortal ? '3000+' : entry.elo}
                           </span>
                         </td>
@@ -359,6 +583,11 @@ export default function Leaderboards() {
             <span>Showing verified active players</span>
             <span>Total: {players.length}</span>
           </div>
+        </div>
+
+        {/* Footer info for mobile */}
+        <div className="block md:hidden text-center text-xs text-text-muted py-2">
+          <span>Showing {players.length} verified players</span>
         </div>
 
       </div>

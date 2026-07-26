@@ -14,6 +14,8 @@ CREATE TABLE profiles (
     department TEXT NOT NULL,
     faculty TEXT NOT NULL,
     phone TEXT,
+    gender TEXT,
+    is_alumni BOOLEAN DEFAULT FALSE,
     bio TEXT DEFAULT '',
     avatar_url TEXT,
     lichess_username TEXT UNIQUE,
@@ -121,7 +123,7 @@ BEGIN
     END IF;
 
     INSERT INTO profiles (
-        id, fca_id, full_name, reg_number, department, faculty, phone, 
+        id, fca_id, full_name, reg_number, department, faculty, phone, gender, is_alumni,
         lichess_username, chesscom_username, status, is_admin, is_arbiter
     )
     VALUES (
@@ -132,6 +134,8 @@ BEGIN
         COALESCE(NEW.raw_user_meta_data->>'department', 'N/A'),
         COALESCE(NEW.raw_user_meta_data->>'faculty', 'N/A'),
         NULLIF(NEW.raw_user_meta_data->>'phone', ''),
+        NULLIF(NEW.raw_user_meta_data->>'gender', ''),
+        COALESCE((NEW.raw_user_meta_data->>'is_alumni')::boolean, FALSE),
         NULLIF(NEW.raw_user_meta_data->>'lichess_username', ''),
         NULLIF(NEW.raw_user_meta_data->>'chesscom_username', ''),
         COALESCE((NEW.raw_user_meta_data->>'status')::player_status, 'PENDING'),

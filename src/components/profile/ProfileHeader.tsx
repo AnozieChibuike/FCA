@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { User, Edit3, Camera, ExternalLink } from 'lucide-react';
+import { User, Edit3, Camera, ExternalLink, AlertTriangle } from 'lucide-react';
 import { TITLE_CONFIG, type Profile as ProfileType } from '../../types';
 import { FUTO_FACULTIES } from '../../data/futoData';
 import { initiateLichessOAuth } from '../../lib/lichessOAuth';
@@ -16,6 +16,8 @@ interface ProfileHeaderProps {
     full_name: string;
     bio: string;
     phone: string;
+    gender: string;
+    is_alumni: boolean;
     lichess_username: string;
     chesscom_username: string;
     department: string;
@@ -25,6 +27,8 @@ interface ProfileHeaderProps {
     full_name: string;
     bio: string;
     phone: string;
+    gender: string;
+    is_alumni: boolean;
     lichess_username: string;
     chesscom_username: string;
     department: string;
@@ -117,7 +121,7 @@ export default function ProfileHeader({
               <select
                 value={editForm.faculty}
                 onChange={(e) => setEditForm({ ...editForm, faculty: e.target.value, department: '' })}
-                className="input-field text-xs w-full sm:w-1/2 cursor-pointer appearance-none"
+                className="input-field text-xs w-full sm:w-1/3 cursor-pointer appearance-none"
               >
                 <option value="">Select School/Faculty...</option>
                 {FUTO_FACULTIES.map((fac) => (
@@ -127,7 +131,7 @@ export default function ProfileHeader({
               <select
                 value={editForm.department}
                 onChange={(e) => setEditForm({ ...editForm, department: e.target.value })}
-                className="input-field text-xs w-full sm:w-1/2 cursor-pointer appearance-none"
+                className="input-field text-xs w-full sm:w-1/3 cursor-pointer appearance-none"
                 disabled={!editForm.faculty}
               >
                 <option value="">{editForm.faculty ? 'Select Department...' : 'First Select Faculty...'}</option>
@@ -135,16 +139,73 @@ export default function ProfileHeader({
                   <option key={dept} value={dept}>{dept}</option>
                 ))}
               </select>
+              <select
+                value={editForm.gender}
+                onChange={(e) => setEditForm({ ...editForm, gender: e.target.value })}
+                className="input-field text-xs w-full sm:w-1/3 cursor-pointer appearance-none"
+              >
+                <option value="">Gender (Unspecified)</option>
+                <option value="MALE">Male</option>
+                <option value="FEMALE">Female</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <input
+                type="checkbox"
+                id="edit_is_alumni"
+                checked={editForm.is_alumni}
+                onChange={(e) => setEditForm({ ...editForm, is_alumni: e.target.checked })}
+                className="w-4 h-4 rounded bg-surface border-chess-border text-primary focus:ring-primary cursor-pointer"
+              />
+              <label htmlFor="edit_is_alumni" className="text-xs font-semibold text-white cursor-pointer select-none">
+                🎓 FUTO Alumni Status
+              </label>
             </div>
           </div>
         ) : (
           <div>
-            <h1 className="font-extrabold text-2xl sm:text-3xl text-white mb-1 flex items-center justify-center md:justify-start gap-2 truncate">
-              {player.full_name}
+            <h1 className="font-extrabold text-2xl sm:text-3xl text-white mb-1 flex items-center justify-center md:justify-start gap-2 flex-wrap">
+              <span>{player.full_name}</span>
+              {player.is_alumni && (
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-emerald-950/90 text-emerald-300 border border-emerald-500/60 inline-flex items-center gap-1 shadow-sm">
+                  🎓 Alumni
+                </span>
+              )}
+              {player.gender === 'FEMALE' && (
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-rose-950/90 text-rose-300 border border-rose-500/60 inline-flex items-center gap-1 shadow-sm">
+                  ♀ Female
+                </span>
+              )}
+              {player.gender === 'MALE' && (
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-sky-950/90 text-sky-300 border border-sky-500/60 inline-flex items-center gap-1 shadow-sm">
+                  ♂ Male
+                </span>
+              )}
+              {!player.gender && (
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#161512] text-amber-400/90 border border-amber-500/30 inline-flex items-center gap-1">
+                  Gender: Unspecified
+                </span>
+              )}
             </h1>
             <p className="text-text-muted text-xs sm:text-sm mb-3 font-medium">
               {displayDept} · {displayFaculty}
             </p>
+
+            {isOwnProfile && !player.gender && (
+              <div className="mb-4 p-3 rounded-lg bg-amber-950/40 border border-amber-500/40 text-amber-300 text-xs flex flex-col sm:flex-row items-center justify-between gap-2.5 shadow-sm">
+                <div className="flex items-center gap-2 text-left">
+                  <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span>Your gender is currently unset. Set your gender in profile settings to be ranked in category leaderboards.</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={onStartEditing}
+                  className="px-3 py-1 rounded bg-amber-500 text-black font-bold text-xs hover:bg-amber-400 transition-colors shrink-0 cursor-pointer shadow active:scale-95"
+                >
+                  Set Gender
+                </button>
+              </div>
+            )}
           </div>
         )}
 

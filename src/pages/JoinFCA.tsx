@@ -16,6 +16,8 @@ const detailsSchema = z.object({
   department: z.string().min(2, 'Department is required'),
   faculty: z.string().min(2, 'Faculty is required'),
   phone: z.string().optional(),
+  gender: z.string().optional(),
+  isAlumni: z.boolean().optional(),
 });
 
 const accountSchema = z.object({
@@ -71,6 +73,8 @@ export default function JoinFCA() {
       department: details.department,
       faculty: details.faculty,
       phone: details.phone || null,
+      gender: details.gender || null,
+      is_alumni: details.isAlumni || false,
       lichess_username: pendingLichess || null,
       chesscom_username: pendingChesscom || null,
       fca_id: fcaId,
@@ -185,6 +189,27 @@ export default function JoinFCA() {
                   <p className="text-cta text-xs mt-1">{detailsForm.formState.errors.faculty.message}</p>
                 )}
               </div>
+            </div>
+
+            <div>
+              <label htmlFor="gender" className="block text-xs sm:text-sm font-semibold text-text mb-1.5">Gender (optional)</label>
+              <select id="gender" {...detailsForm.register('gender')} className="input-field cursor-pointer appearance-none">
+                <option value="">Prefer not to say / Unspecified</option>
+                <option value="MALE">Male</option>
+                <option value="FEMALE">Female</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2.5 pt-1">
+              <input
+                type="checkbox"
+                id="isAlumni"
+                {...detailsForm.register('isAlumni')}
+                className="w-4 h-4 rounded bg-surface border-chess-border text-primary focus:ring-primary cursor-pointer"
+              />
+              <label htmlFor="isAlumni" className="text-xs sm:text-sm font-semibold text-text cursor-pointer select-none">
+                🎓 I am a FUTO Alumni
+              </label>
             </div>
 
             <div>
