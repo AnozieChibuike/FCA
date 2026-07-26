@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   Search, Star, User, Target, Zap, Clock, Flame, Shield,
-  Trophy, Crown, Swords, Building, Filter, GraduationCap
+  Trophy, Crown, Swords, Building, Filter, GraduationCap, UserCheck
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
@@ -24,7 +24,7 @@ export default function Leaderboards() {
   const [players, setPlayers] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [genderFilter, setGenderFilter] = useState<'ALL' | 'FEMALE' | 'MALE' | 'ALUMNI'>('ALL');
+  const [genderFilter, setGenderFilter] = useState<'ALL' | 'FEMALE' | 'MALE' | 'ALUMNI' | 'STUDENT'>('ALL');
 
   const [searchQuery, setSearchQuery] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('');
@@ -87,6 +87,8 @@ export default function Leaderboards() {
         query = query.eq('gender', 'MALE');
       } else if (genderFilter === 'ALUMNI') {
         query = query.eq('is_alumni', true);
+      } else if (genderFilter === 'STUDENT') {
+        query = query.eq('is_alumni', false);
       }
 
       if (departmentFilter) {
@@ -250,6 +252,17 @@ export default function Leaderboards() {
           >
             <Swords className="w-3.5 h-3.5 text-sky-300 shrink-0" />
             <span>Male Category</span>
+          </button>
+          <button
+            onClick={() => setGenderFilter('STUDENT')}
+            className={`px-3.5 py-2 rounded-lg text-xs sm:text-sm font-extrabold transition-all cursor-pointer flex items-center gap-2 select-none active:scale-95 shrink-0 ${
+              genderFilter === 'STUDENT'
+                ? 'bg-sky-600 text-white shadow-md shadow-sky-900/40'
+                : 'bg-surface text-sky-300/80 border border-sky-900/40 hover:text-sky-300 hover:border-sky-600/60'
+            }`}
+          >
+            <UserCheck className="w-3.5 h-3.5 text-sky-300 shrink-0" />
+            <span>Student Category</span>
           </button>
           <button
             onClick={() => setGenderFilter('ALUMNI')}
