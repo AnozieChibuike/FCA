@@ -1,5 +1,5 @@
-import { History, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react';
-import { Game, Profile as ProfileType } from '../../types';
+import { History, ExternalLink, ChevronLeft, ChevronRight, Zap, Clock, Flame, Shield, Layers } from 'lucide-react';
+import { Game, Profile as ProfileType, GameMode, MODE_LABELS } from '../../types';
 import { extractLichessGameId } from '../../lib/lichess';
 
 interface EnrichedGame extends Game {
@@ -16,6 +16,9 @@ interface EnrichedGame extends Game {
 interface MatchHistoryTableProps {
   player: ProfileType;
   allGames: Game[];
+  tcFilter: 'ALL' | GameMode;
+  onTcFilterChange: (tc: 'ALL' | GameMode) => void;
+  filteredGamesCount: number;
   paginatedGames: EnrichedGame[];
   currentGamesPage: number;
   totalGamesPages: number;
@@ -24,9 +27,20 @@ interface MatchHistoryTableProps {
   onPageChange: (page: number) => void;
 }
 
+const TC_FILTERS: Array<{ id: 'ALL' | GameMode; label: string; icon: React.ReactNode }> = [
+  { id: 'ALL', label: 'All Modes', icon: <Layers className="w-3.5 h-3.5 shrink-0" /> },
+  { id: 'BLITZ', label: 'Blitz', icon: <Zap className="w-3.5 h-3.5 text-amber-400 shrink-0" /> },
+  { id: 'RAPID', label: 'Rapid', icon: <Clock className="w-3.5 h-3.5 text-blue-400 shrink-0" /> },
+  { id: 'BULLET', label: 'Bullet', icon: <Flame className="w-3.5 h-3.5 text-rose-500 shrink-0" /> },
+  { id: 'CLASSICAL', label: 'Classical', icon: <Shield className="w-3.5 h-3.5 text-emerald-400 shrink-0" /> },
+];
+
 export default function MatchHistoryTable({
   player,
   allGames,
+  tcFilter,
+  onTcFilterChange,
+  filteredGamesCount,
   paginatedGames,
   currentGamesPage,
   totalGamesPages,
@@ -36,16 +50,40 @@ export default function MatchHistoryTable({
 }: MatchHistoryTableProps) {
   return (
     <div className="mb-8">
-      {/* Match History Header */}
-      <div className="mb-4 flex items-center justify-between gap-2.5">
+      {/* Match History Header & TC Filter */}
+      <div className="mb-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
           <History className="w-5 h-5 text-primary shrink-0" />
           <h2 className="text-lg sm:text-xl font-extrabold text-white">Match History</h2>
+          {allGames.length > 0 && (
+            <span className="text-xs text-text-muted font-mono">
+              Total: <strong className="text-white">{filteredGamesCount}</strong>
+              {tcFilter !== 'ALL' && <span className="opacity-70"> ({allGames.length} overall)</span>}
+            </span>
+          )}
         </div>
+
+        {/* Time Control Filter Pills */}
         {allGames.length > 0 && (
-          <span className="text-xs text-text-muted font-mono">
-            Total: <strong className="text-white">{allGames.length}</strong>
-          </span>
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 md:pb-0 -mx-1 px-1">
+            {TC_FILTERS.map((item) => {
+              const isActive = tcFilter === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => onTcFilterChange(item.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 select-none active:scale-95 border ${
+                    isActive
+                      ? 'bg-primary text-black border-primary shadow-md'
+                      : 'bg-[#161512] text-text-muted border-chess-border hover:text-white hover:bg-[#262421]'
+                  }`}
+                >
+                  {item.icon}
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
         )}
       </div>
 
@@ -54,7 +92,9 @@ export default function MatchHistoryTable({
         <div className="sm:hidden divide-y divide-chess-border">
           {paginatedGames.length === 0 ? (
             <div className="p-6 text-center text-text-muted italic text-xs">
-              No games recorded yet.
+              {tcFilter === 'ALL'
+                ? 'No games recorded yet.'
+                : `No ${MODE_LABELS[tcFilter]} games recorded yet.`}
             </div>
           ) : (
             paginatedGames.map((game) => {
@@ -160,7 +200,9 @@ export default function MatchHistoryTable({
               {paginatedGames.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="p-8 text-center text-text-muted italic">
-                    No games recorded yet.
+                    {tcFilter === 'ALL'
+                      ? 'No games recorded yet.'
+                      : `No ${MODE_LABELS[tcFilter]} games recorded yet.`}
                   </td>
                 </tr>
               ) : (
@@ -247,7 +289,9 @@ export default function MatchHistoryTable({
         {allGames.length > 0 && (
           <div className="bg-[#1E1C18] border-t border-chess-border p-3 px-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-text-muted">
             <span>
-              Showing {startIndex + 1}-{Math.min(startIndex + gamesPerPage, allGames.length)} of {allGames.length} games
+              {filteredGamesCount > 0
+                ? `Showing ${startIndex + 1}-${Math.min(startIndex + gamesPerPage, filteredGamesCount)} of ${filteredGamesCount} games`
+                : 'No matching games'}
             </span>
 
             {totalGamesPages > 1 && (

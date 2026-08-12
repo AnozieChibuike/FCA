@@ -4,7 +4,7 @@ import { User } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
 import { calculateElo, getKFactor } from '../lib/elo';
-import { type Profile as ProfileType, type Game } from '../types';
+import { type Profile as ProfileType, type Game, type GameMode } from '../types';
 import PlayerStats from '../components/PlayerStats';
 import ChesscomVerifyModal from '../components/ChesscomVerifyModal';
 
@@ -18,6 +18,7 @@ export default function Profile() {
   const { profile: authProfile, refreshProfile } = useAuth();
   const [player, setPlayer] = useState<ProfileType | null>(null);
   const [allGames, setAllGames] = useState<Game[]>([]);
+  const [tcFilter, setTcFilter] = useState<'ALL' | GameMode>('ALL');
   const [gamesPage, setGamesPage] = useState(1);
   const GAMES_PER_PAGE = 10;
 
@@ -129,10 +130,20 @@ export default function Profile() {
     }));
   }, [allGames, player]);
 
-  const totalGamesPages = Math.ceil(enrichedGames.length / GAMES_PER_PAGE) || 1;
+  const filteredGames = useMemo(() => {
+    if (tcFilter === 'ALL') return enrichedGames;
+    return enrichedGames.filter((g) => g.mode === tcFilter);
+  }, [enrichedGames, tcFilter]);
+
+  const totalGamesPages = Math.ceil(filteredGames.length / GAMES_PER_PAGE) || 1;
   const currentGamesPage = Math.min(gamesPage, totalGamesPages);
   const startIndex = (currentGamesPage - 1) * GAMES_PER_PAGE;
-  const paginatedGames = enrichedGames.slice(startIndex, startIndex + GAMES_PER_PAGE);
+  const paginatedGames = filteredGames.slice(startIndex, startIndex + GAMES_PER_PAGE);
+
+  function handleTcFilterChange(newTc: 'ALL' | GameMode) {
+    setTcFilter(newTc);
+    setGamesPage(1);
+  }
 
   useEffect(() => {
     async function fetchProfile() {
@@ -360,6 +371,9 @@ export default function Profile() {
       <MatchHistoryTable
         player={player}
         allGames={allGames}
+        tcFilter={tcFilter}
+        onTcFilterChange={handleTcFilterChange}
+        filteredGamesCount={filteredGames.length}
         paginatedGames={paginatedGames}
         currentGamesPage={currentGamesPage}
         totalGamesPages={totalGamesPages}

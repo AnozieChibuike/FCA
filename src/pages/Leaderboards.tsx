@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   Search, Star, User, Target, Zap, Clock, Flame, Shield,
-  Trophy, Crown, Swords, Building, Filter, GraduationCap, UserCheck
+  Trophy, Crown, Swords, Building, Filter, GraduationCap, UserCheck, Gamepad2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
@@ -33,6 +33,8 @@ export default function Leaderboards() {
   const [departments, setDepartments] = useState<string[]>([]);
   const [faculties, setFaculties] = useState<string[]>([]);
 
+  const [hideZeroGames, setHideZeroGames] = useState(true);
+
   const [pendingScrollToMyRank, setPendingScrollToMyRank] = useState(false);
 
   const myEntry = players.find((e) => profile && e.player.id === profile.id);
@@ -40,6 +42,13 @@ export default function Leaderboards() {
   const jumpToMyPosition = () => {
     if (!profile) return;
     
+    const myGames = (profile[`${mode.toLowerCase()}_games` as keyof Profile] as number) || 0;
+    const isImmortal = profile.is_immortal || profile.fca_id === 'FCA-ETERNAL';
+
+    if (!isImmortal && myGames === 0 && hideZeroGames) {
+      setHideZeroGames(false);
+    }
+
     // Reset filters if active to ensure profile is in dataset
     if (searchQuery || departmentFilter || facultyFilter || genderFilter !== 'ALL') {
       setSearchQuery('');
@@ -110,16 +119,23 @@ export default function Leaderboards() {
       const { data } = await query;
 
       if (data) {
+        const filteredData = hideZeroGames
+          ? data.filter((player: Profile) => {
+              const gamesCount = (player[`${mode.toLowerCase()}_games` as keyof Profile] as number) || 0;
+              return player.is_immortal || player.fca_id === 'FCA-ETERNAL' || gamesCount > 0;
+            })
+          : data;
+
         let immortalCount = 0;
-        const entries: LeaderboardEntry[] = data.map((player: Profile, index: number) => {
-          if (player.is_immortal) {
+        const entries: LeaderboardEntry[] = filteredData.map((player: Profile, index: number) => {
+          if (player.is_immortal || player.fca_id === 'FCA-ETERNAL') {
             immortalCount++;
           }
           return {
-            rank: player.is_immortal ? 0 : index - immortalCount + 1,
+            rank: (player.is_immortal || player.fca_id === 'FCA-ETERNAL') ? 0 : index - immortalCount + 1,
             player,
             elo: player[`${mode.toLowerCase()}_elo` as keyof Profile] as number,
-            games: player[`${mode.toLowerCase()}_games` as keyof Profile] as number,
+            games: (player[`${mode.toLowerCase()}_games` as keyof Profile] as number) || 0,
             peak_elo: (player[`peak_${mode.toLowerCase()}_elo` as keyof Profile] as number) ?? (player[`${mode.toLowerCase()}_elo` as keyof Profile] as number),
           };
         });
@@ -132,7 +148,7 @@ export default function Leaderboards() {
       fetchLeaderboard();
     }, 300);
     return () => clearTimeout(timeoutId);
-  }, [mode, genderFilter, departmentFilter, facultyFilter, searchQuery]);
+  }, [mode, genderFilter, departmentFilter, facultyFilter, searchQuery, hideZeroGames]);
 
   useEffect(() => {
     async function fetchFilters() {
@@ -284,7 +300,7 @@ export default function Leaderboards() {
         </div>
 
         {/* Filters Row */}
-        <div className="flex flex-col md:flex-row gap-2.5 sm:gap-3 mb-6">
+        <div className="flex flex-col lg:flex-row gap-2.5 sm:gap-3 mb-6">
           <div className="relative flex-1">
             <Search className="w-4 h-4 text-text-muted absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
@@ -297,7 +313,7 @@ export default function Leaderboards() {
             />
           </div>
 
-          <div className="flex flex-row gap-2.5 flex-1">
+          <div className="flex flex-col sm:flex-row gap-2.5 flex-1">
             <div className="flex-1 relative">
               <select
                 value={departmentFilter}
@@ -333,6 +349,23 @@ export default function Leaderboards() {
                 ▼
               </div>
             </div>
+
+            {/* 0-Games Filter Toggle */}
+            <button
+              type="button"
+              onClick={() => setHideZeroGames(!hideZeroGames)}
+              className={`px-3.5 py-2.5 rounded-md min-h-[42px] text-xs sm:text-sm font-extrabold transition-all cursor-pointer flex items-center justify-center gap-2 select-none active:scale-95 border shrink-0 ${
+                hideZeroGames
+                  ? 'bg-primary/15 text-primary border-primary/50 shadow-sm hover:bg-primary/25'
+                  : 'bg-surface text-text-muted border-chess-border hover:text-white hover:border-chess-border/80'
+              }`}
+              title={hideZeroGames ? "Currently showing active players with games > 0. Click to include 0-game players." : "Currently showing all players. Click to hide 0-game players."}
+            >
+              <Gamepad2 className={`w-4 h-4 shrink-0 ${hideZeroGames ? 'text-primary' : 'text-text-muted'}`} />
+              <span className="whitespace-nowrap">
+                {hideZeroGames ? 'Active Players (>0)' : 'All Players (Inc. 0)'}
+              </span>
+            </button>
           </div>
         </div>
 
@@ -345,6 +378,11 @@ export default function Leaderboards() {
           ) : players.length === 0 ? (
             <div className="p-10 text-center text-text-muted bg-surface border border-chess-border rounded-lg text-sm">
               No players found for this filter.
+              {hideZeroGames && (
+                <p className="text-xs text-text-muted/70 mt-1">
+                  Try switching to "All Players" to include profiles with 0 games.
+                </p>
+              )}
             </div>
           ) : (
             players.map((entry) => {
@@ -463,6 +501,11 @@ export default function Leaderboards() {
                   <tr>
                     <td colSpan={7} className="p-10 text-center text-text-muted">
                       No players found for this filter.
+                      {hideZeroGames && (
+                        <p className="text-xs text-text-muted/70 mt-1">
+                          Try switching to "All Players" to include profiles with 0 games.
+                        </p>
+                      )}
                     </td>
                   </tr>
                 ) : (
@@ -599,14 +642,14 @@ export default function Leaderboards() {
           </div>
 
           <div className="bg-[#1E1C18] border-t border-chess-border p-3 px-4 flex items-center justify-between text-xs text-text-muted">
-            <span>Showing verified active players</span>
+            <span>{hideZeroGames ? 'Showing verified active players (games > 0)' : 'Showing all verified players (inc. 0 games)'}</span>
             <span>Total: {players.length}</span>
           </div>
         </div>
 
         {/* Footer info for mobile */}
         <div className="block md:hidden text-center text-xs text-text-muted py-2">
-          <span>Showing {players.length} verified players</span>
+          <span>Showing {players.length} {hideZeroGames ? 'active players (games > 0)' : 'verified players'}</span>
         </div>
 
       </div>

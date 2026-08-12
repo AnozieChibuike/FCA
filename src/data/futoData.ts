@@ -106,6 +106,7 @@ export const FUTO_FACULTIES: FUTOFaculty[] = [
     code: 'SBMS',
     name: 'School of Basic Medical Sciences (SBMS)',
     departments: [
+      'Medicine and Surgery',
       'Human Anatomy',
       'Human Physiology'
     ]
