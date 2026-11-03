@@ -23,6 +23,10 @@ All files are safe to run more than once.
 Games are the source of truth: ratings, peaks and titles are always rebuilt from them, so late imports, voided games
 and corrected results all land in the right chronological place. Titles are never taken away by a replay.
 
+Titles are awarded by `refresh_titles()` using the rules in `title_for_stats()` (the only copy of the rules). It runs
+after every re-rate, whenever `tournament_results` change and whenever a member's Lichess handle changes, and it
+unlocks the matching title badges at the same time.
+
 ## Resync
 
 When a member links Lichess (verified server-side via `link_lichess`), every arena they appear in is scanned and

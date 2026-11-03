@@ -1,13 +1,9 @@
-import type { FcaTitle, PlayerAchievement, Profile, Standing } from '../types';
+import type { FcaTitle, Profile, Standing } from '../types';
+import { TITLE_CONFIG } from '../types';
 
-export const TITLE_RANKS: Record<FcaTitle, number> = {
-  NONE: 0,
-  FCM: 1,
-  FM: 2,
-  FIM: 3,
-  FGM: 4,
-  FET: 5,
-};
+// Display only: titles are awarded by the database (title_for_stats / refresh_titles).
+const TITLE_LADDER: FcaTitle[] = ['NONE', 'FCM', 'FM', 'FIM', 'FGM'];
+const MIN_TITLE_GAMES = TITLE_CONFIG.FCM.minGames ?? 25;
 
 export function calculateElo(
   ratingA: number,
@@ -29,33 +25,6 @@ export function calculateElo(
 
 export function getKFactor(gamesPlayed: number): number {
   return gamesPlayed < 15 ? 40 : 20;
-}
-
-export function getTitleForRating(peakElo: number): FcaTitle {
-  if (peakElo >= 1800) return 'FGM';
-  if (peakElo >= 1700) return 'FIM';
-  if (peakElo >= 1550) return 'FM';
-  if (peakElo >= 1400) return 'FCM';
-  return 'NONE';
-}
-
-export function getTitleForStats({
-  peakElo,
-  totalGames,
-  fcaPodiums = 0,
-  fcaWins = 0,
-}: {
-  peakElo: number;
-  totalGames: number;
-  fcaPodiums?: number;
-  fcaWins?: number;
-}): FcaTitle {
-  if (totalGames < 25) return 'NONE';
-  if (peakElo >= 1800 && fcaWins >= 3) return 'FGM';
-  if (peakElo >= 1700 && fcaPodiums >= 5) return 'FIM';
-  if (peakElo >= 1550) return 'FM';
-  if (peakElo >= 1400) return 'FCM';
-  return 'NONE';
 }
 
 export interface TitleProgress {
@@ -88,85 +57,22 @@ export function getTitleProgress(player: Profile, events: Standing[] = []): Titl
   const fcaPodiums = events.filter((e) => e.fca_rank && e.fca_rank <= 3).length;
   const fcaWins = events.filter((e) => e.fca_rank === 1).length;
 
-  if (isImmortal || currentTitle === 'FET' || currentTitle === 'FGM') {
-    return {
-      currentTitle,
-      nextTitle: null,
-      peakElo,
-      targetElo: null,
-      totalGames,
-      minGamesRequired: 25,
-      fcaPodiums,
-      targetPodiums: null,
-      fcaWins,
-      targetWins: null,
-      isMaxTitle: true,
-      isImmortal,
-    };
-  }
-
-  let nextTitle: FcaTitle | null = null;
-  let targetElo: number | null = null;
-  let targetPodiums: number | null = null;
-  let targetWins: number | null = null;
-
-  if (currentTitle === 'NONE') {
-    nextTitle = 'FCM';
-    targetElo = 1400;
-  } else if (currentTitle === 'FCM') {
-    nextTitle = 'FM';
-    targetElo = 1550;
-  } else if (currentTitle === 'FM') {
-    nextTitle = 'FIM';
-    targetElo = 1700;
-    targetPodiums = 5;
-  } else if (currentTitle === 'FIM') {
-    nextTitle = 'FGM';
-    targetElo = 1800;
-    targetWins = 3;
-  }
+  const step = TITLE_LADDER.indexOf(currentTitle);
+  const nextTitle = isImmortal || step < 0 ? null : TITLE_LADDER[step + 1] ?? null;
+  const next = nextTitle ? TITLE_CONFIG[nextTitle] : null;
 
   return {
     currentTitle,
     nextTitle,
     peakElo,
-    targetElo,
+    targetElo: next?.threshold ?? null,
     totalGames,
-    minGamesRequired: 25,
+    minGamesRequired: MIN_TITLE_GAMES,
     fcaPodiums,
-    targetPodiums,
+    targetPodiums: next?.podiumsNeeded ?? null,
     fcaWins,
-    targetWins,
-    isMaxTitle: false,
-    isImmortal: false,
+    targetWins: next?.winsNeeded ?? null,
+    isMaxTitle: !nextTitle,
+    isImmortal,
   };
-}
-
-export function syncTitleAchievements(badges: PlayerAchievement[], player?: Profile | null): PlayerAchievement[] {
-  if (!player || player.is_immortal) return badges;
-  const currentRank = TITLE_RANKS[player.earned_title || 'NONE'] || 0;
-  if (currentRank === 0) return badges;
-
-  const map = new Map(badges.map((b) => [b.achievement_key, { ...b }]));
-  const steps: Array<[string, number, number]> = [
-    ['title_fcm', 1, 1400],
-    ['title_fm', 2, 1550],
-    ['title_fim', 3, 1700],
-    ['title_fgm', 4, 1800],
-  ];
-
-  for (const [key, rank, target] of steps) {
-    if (currentRank >= rank) {
-      const existing = map.get(key);
-      map.set(key, {
-        player_id: player.id,
-        achievement_key: key,
-        earned_at: existing?.earned_at || player.created_at || new Date().toISOString(),
-        progress: Math.max(existing?.progress || 0, target),
-        target,
-        context: existing?.context || null,
-      });
-    }
-  }
-  return Array.from(map.values());
 }

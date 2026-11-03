@@ -634,6 +634,8 @@ async function refreshAchievements() {
   let newlyEarned = 0;
   for (const r of rows) {
     const e: any = before.get(`${r.player_id}|${r.achievement_key}`);
+    // The database stamps title badges when the title is awarded; keep that date.
+    if (r.achievement_key.startsWith('title_') && r.earned_at && e?.earned_at) r.earned_at = e.earned_at;
     const sameEarned = (!e?.earned_at && !r.earned_at) || (!!e?.earned_at && !!r.earned_at && Date.parse(e.earned_at) === Date.parse(r.earned_at));
     if (e && sameEarned && e.progress === r.progress && e.target === r.target) continue;
     changed.push({ ...r, updated_at: now });

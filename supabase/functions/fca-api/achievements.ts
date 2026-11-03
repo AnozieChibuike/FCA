@@ -62,10 +62,10 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { key: 'rating_1300', name: 'Rising Star', description: 'Reach a 1300 rating in any time control.', category: 'Rating', tier: 'bronze', icon: 'Star', target: 1300 },
   { key: 'rating_1400', name: '1400 Club', description: 'Reach a 1400 rating in any time control.', category: 'Rating', tier: 'silver', icon: 'Sparkle', target: 1400 },
   { key: 'rating_1500', name: '1500 Club', description: 'Reach a 1500 rating in any time control.', category: 'Rating', tier: 'gold', icon: 'MountainSnow', target: 1500 },
-  { key: 'title_fcm', name: 'Candidate Master', description: 'Earn the FCM title (peak 1400).', category: 'Rating', tier: 'gold', icon: 'GraduationCap', target: 1400 },
-  { key: 'title_fm', name: 'FCA Master', description: 'Earn the FM title (peak 1550).', category: 'Rating', tier: 'platinum', icon: 'Medal', target: 1550 },
-  { key: 'title_fim', name: 'International Master', description: 'Earn the FIM title (peak 1700).', category: 'Rating', tier: 'legendary', icon: 'Globe', target: 1700 },
-  { key: 'title_fgm', name: 'Grandmaster', description: 'Earn the FGM title (peak 1800).', category: 'Rating', tier: 'legendary', icon: 'Crown', target: 1800 },
+  { key: 'title_fcm', name: 'Candidate Master', description: 'Earn the FCM title: 1400 peak and 25+ rated games.', category: 'Rating', tier: 'gold', icon: 'GraduationCap', target: 1400 },
+  { key: 'title_fm', name: 'FCA Master', description: 'Earn the FM title: 1550 peak and 25+ rated games.', category: 'Rating', tier: 'platinum', icon: 'Medal', target: 1550 },
+  { key: 'title_fim', name: 'International Master', description: 'Earn the FIM title: 1700 peak, 5 FCA podiums and 25+ rated games.', category: 'Rating', tier: 'legendary', icon: 'Globe', target: 1700 },
+  { key: 'title_fgm', name: 'Grandmaster', description: 'Earn the FGM title: 1800 peak, 3 FCA wins and 25+ rated games.', category: 'Rating', tier: 'legendary', icon: 'Crown', target: 1800 },
   { key: 'rocket_50', name: 'Rocket', description: 'Gain 50+ rating points in a single event.', category: 'Rating', tier: 'silver', icon: 'TrendingUp', target: 50 },
   { key: 'rocket_100', name: 'Comet', description: 'Gain 100+ rating points in a single event.', category: 'Rating', tier: 'gold', icon: 'Rocket', target: 100 },
 
@@ -224,8 +224,9 @@ function awardThresholds(s: PlayerState, prefix: string, steps: number[], value:
   for (const n of steps) if (value >= n) award(s, `${prefix}${n}`, at, ctx);
 }
 
-const TITLE_STEPS: Array<[number, string]> = [[1400, 'title_fcm'], [1550, 'title_fm'], [1700, 'title_fim'], [1800, 'title_fgm']];
-const TITLE_MIN_RATING: Record<string, number> = { FCM: 1400, FM: 1550, FIM: 1700, FGM: 1800 };
+// Titles are awarded by the database (refresh_titles); a title unlocks its badge and every one below it.
+const TITLE_BADGES = ['title_fcm', 'title_fm', 'title_fim', 'title_fgm'];
+const TITLE_RANK: Record<string, number> = { FCM: 1, FM: 2, FIM: 3, FGM: 4 };
 
 export function computeAchievements(input: {
   profiles: AchProfile[];
@@ -320,7 +321,6 @@ export function computeAchievements(input: {
       if (myAfter != null) {
         s.maxRating = Math.max(s.maxRating, myAfter);
         awardThresholds(s, 'rating_', [1300, 1400, 1500], s.maxRating, at, { mode: g.mode, rating: myAfter });
-        for (const [min, key] of TITLE_STEPS) if (s.maxRating >= min) award(s, key, at, { mode: g.mode, rating: myAfter });
       }
 
       if ((s.modes.BLITZ || 0) >= 25) award(s, 'blitz_25', at);
@@ -470,9 +470,7 @@ export function computeAchievements(input: {
     const recruits = (approvedRecruits.get(p.id) || []).sort();
     s.recruits = recruits.length;
     for (const n of [1, 5, 10]) if (recruits.length >= n) award(s, `recruiter_${n}`, recruits[n - 1]);
-    // Titles awarded before the replay data existed still count.
-    const titleMin = TITLE_MIN_RATING[p.earned_title || ''];
-    if (titleMin) for (const [min, key] of TITLE_STEPS) if (titleMin >= min) award(s, key, p.created_at);
+    for (const key of TITLE_BADGES.slice(0, TITLE_RANK[p.earned_title || ''] ?? 0)) award(s, key, p.created_at);
   }
 
   // Progress values for locked badges.

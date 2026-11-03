@@ -51,12 +51,12 @@ export default function Compare() {
           {[pa, pb].map((p, i) => (
             <Link key={p.id} to={`/profile/${p.id}`} className={`flex min-w-0 flex-col items-center gap-2 text-center ${i === 1 ? 'order-3' : ''}`}>
               <Avatar src={p.avatar_url} name={p.full_name} size="lg" />
-              <span className="flex max-w-full items-center gap-1"><span className="truncate text-sm font-bold text-white">{p.full_name}</span><TitleBadge title={p.earned_title} /></span>
+              <span className="flex max-w-full items-center gap-1"><span className="truncate text-sm font-bold text-white">{p.full_name}</span><TitleBadge title={p.earned_title} className="shrink-0" /></span>
             </Link>
           ))}
           <div className="order-2 text-center">
-            <div className="text-3xl font-extrabold tabular-nums text-white">{record.w}<span className="mx-1 text-text-muted">–</span>{record.l}</div>
-            <div className="text-xs text-text-muted">{record.d} draw{record.d === 1 ? '' : 's'} · {total} games</div>
+            <div className="whitespace-nowrap text-2xl font-extrabold tabular-nums text-white sm:text-3xl">{record.w}<span className="mx-1 text-text-muted">–</span>{record.l}</div>
+            <div className="text-[11px] text-text-muted sm:text-xs">{record.d} draw{record.d === 1 ? '' : 's'} · {total} games</div>
           </div>
         </div>
         {total > 0 && (
@@ -66,7 +66,7 @@ export default function Compare() {
             <span className="h-full bg-rose-500" style={{ width: `${pct(record.l)}%` }} />
           </div>
         )}
-        <div className="mt-5 grid grid-cols-4 gap-2 border-t border-chess-border pt-4">
+        <div className="mt-5 grid grid-cols-2 gap-x-2 gap-y-4 border-t border-chess-border pt-4 sm:grid-cols-4">
           {MODES.map((m) => {
             const ra = modeRating(pa, m).elo;
             const rb = modeRating(pb, m).elo;
