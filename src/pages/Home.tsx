@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Users, Swords, CalendarDays, Activity, Crown, GraduationCap, Sparkles, Trophy, Share2, CheckCircle2 } from 'lucide-react';
+import { ArrowRight, Users, Swords, CalendarDays, Activity, Crown, GraduationCap, Trophy, Share2, CheckCircle2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
 import {
