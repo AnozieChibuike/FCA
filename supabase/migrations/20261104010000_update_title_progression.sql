@@ -185,4 +185,8 @@ update public.player_achievements set target = 1550 where achievement_key = 'tit
 update public.player_achievements set target = 1700 where achievement_key = 'title_fim' and target <> 1700;
 update public.player_achievements set target = 1800 where achievement_key = 'title_fgm' and target <> 1800;
 
+-- Immediately evaluate and award eligible titles
+select public.recalculate_ratings();
+
+
 
