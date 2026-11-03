@@ -5,6 +5,7 @@ import { useAuth } from '../lib/auth';
 import { fetchAchievementStats, fetchBadgeHolders, fetchPlayerAchievements, type EarnedBadge } from '../lib/api';
 import { formatDate } from '../lib/format';
 import type { PlayerAchievement } from '../types';
+import { syncTitleAchievements } from '../lib/elo';
 import { ACHIEVEMENTS, ACHIEVEMENT_CATEGORIES, BadgeMedal, tierLabel, type AchievementDef } from '../components/achievements/Badges';
 import { Avatar } from '../components/ui/Avatar';
 import { Card, Chip, EmptyState, ProgressBar, Spinner } from '../components/ui/misc';
@@ -26,8 +27,9 @@ export default function Achievements() {
     fetchBadgeHolders(open.key).then(setHolders).catch(() => setHolders([]));
   }, [open]);
 
-  const mineByKey = useMemo(() => new Map(mine.map((m) => [m.achievement_key, m])), [mine]);
-  const myCount = mine.filter((m) => m.earned_at).length;
+  const syncedMine = useMemo(() => syncTitleAchievements(mine, profile), [mine, profile]);
+  const mineByKey = useMemo(() => new Map(syncedMine.map((m) => [m.achievement_key, m])), [syncedMine]);
+  const myCount = syncedMine.filter((m) => m.earned_at).length;
   const list = category === 'All' ? ACHIEVEMENTS : ACHIEVEMENTS.filter((a) => a.category === category);
 
   return (

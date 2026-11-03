@@ -1,4 +1,13 @@
-import type { FcaTitle, Profile, Standing } from '../types';
+import type { FcaTitle, PlayerAchievement, Profile, Standing } from '../types';
+
+export const TITLE_RANKS: Record<FcaTitle, number> = {
+  NONE: 0,
+  FCM: 1,
+  FM: 2,
+  FIM: 3,
+  FGM: 4,
+  FET: 5,
+};
 
 export function calculateElo(
   ratingA: number,
@@ -131,4 +140,33 @@ export function getTitleProgress(player: Profile, events: Standing[] = []): Titl
     isMaxTitle: false,
     isImmortal: false,
   };
+}
+
+export function syncTitleAchievements(badges: PlayerAchievement[], player?: Profile | null): PlayerAchievement[] {
+  if (!player || player.is_immortal) return badges;
+  const currentRank = TITLE_RANKS[player.earned_title || 'NONE'] || 0;
+  if (currentRank === 0) return badges;
+
+  const map = new Map(badges.map((b) => [b.achievement_key, { ...b }]));
+  const steps: Array<[string, number, number]> = [
+    ['title_fcm', 1, 1400],
+    ['title_fm', 2, 1550],
+    ['title_fim', 3, 1700],
+    ['title_fgm', 4, 1800],
+  ];
+
+  for (const [key, rank, target] of steps) {
+    if (currentRank >= rank) {
+      const existing = map.get(key);
+      map.set(key, {
+        player_id: player.id,
+        achievement_key: key,
+        earned_at: existing?.earned_at || player.created_at || new Date().toISOString(),
+        progress: Math.max(existing?.progress || 0, target),
+        target,
+        context: existing?.context || null,
+      });
+    }
+  }
+  return Array.from(map.values());
 }

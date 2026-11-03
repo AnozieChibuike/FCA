@@ -14,6 +14,7 @@ import type { Game, GameMode, PlayerAchievement, Profile as ProfileType, Standin
 import { TITLE_CONFIG, modeRating, totalGames } from '../types';
 import { ModeCards, PerformanceStats, RatingHistory, RecentForm, outcomeFor } from '../components/profile/RatingPanel';
 import TitleProgressPill from '../components/profile/TitleProgressPill';
+import { syncTitleAchievements } from '../lib/elo';
 import MatchList from '../components/profile/MatchList';
 import EditProfileSheet from '../components/profile/EditProfileSheet';
 import OnboardingChecklist from '../components/profile/OnboardingChecklist';
@@ -87,7 +88,8 @@ export default function Profile() {
 
   useEffect(() => setTab('overview'), [id]);
 
-  const earned = useMemo(() => badges.filter((b) => b.earned_at).sort((a, b) => (b.earned_at ?? '').localeCompare(a.earned_at ?? '')), [badges]);
+  const syncedBadges = useMemo(() => syncTitleAchievements(badges, player), [badges, player]);
+  const earned = useMemo(() => syncedBadges.filter((b) => b.earned_at).sort((a, b) => (b.earned_at ?? '').localeCompare(a.earned_at ?? '')), [syncedBadges]);
   const winRate = useMemo(() => {
     const off = games.filter((g) => g.is_official !== false);
     return off.length ? Math.round((off.filter((g) => outcomeFor(g, id!) === 'W').length / off.length) * 100) : 0;
@@ -266,7 +268,7 @@ export default function Profile() {
 
           {tab === 'games' && <MatchList games={games} playerId={player.id} />}
 
-          {tab === 'badges' && <BadgeGrid rows={badges} rarity={rarity} />}
+          {tab === 'badges' && <BadgeGrid rows={syncedBadges} rarity={rarity} />}
 
           {tab === 'events' && (
             events.length === 0 ? (

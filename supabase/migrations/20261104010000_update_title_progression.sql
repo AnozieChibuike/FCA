@@ -174,6 +174,34 @@ begin
   )
   select count(*) into v_changed from upd;
 
+  -- Ensure title badges are awarded in player_achievements for all titled players
+  insert into public.player_achievements (player_id, achievement_key, earned_at, progress, target, updated_at)
+  select p.id,
+         t.key,
+         coalesce(pa.earned_at, p.created_at, now()),
+         greatest(coalesce(pa.progress, 0), t.target),
+         t.target,
+         now()
+    from public.profiles p
+   cross join (
+     values
+       ('title_fcm', 1, 1400),
+       ('title_fm',  2, 1550),
+       ('title_fim', 3, 1700),
+       ('title_fgm', 4, 1800)
+   ) as t(key, rank, target)
+    left join public.player_achievements pa on pa.player_id = p.id and pa.achievement_key = t.key
+   where not p.is_immortal
+     and (
+       public.title_rank(p.earned_title) >= t.rank
+       or greatest(coalesce(p.peak_blitz_elo, 0), coalesce(p.peak_rapid_elo, 0), coalesce(p.peak_bullet_elo, 0), coalesce(p.peak_classical_elo, 0)) >= t.target
+     )
+  on conflict (player_id, achievement_key) do update
+     set earned_at = coalesce(player_achievements.earned_at, excluded.earned_at),
+         progress = greatest(player_achievements.progress, excluded.progress),
+         target = excluded.target,
+         updated_at = now();
+
   select count(distinct t.player_id) into v_players from _fca_rt t where t.games > 0;
 
   return jsonb_build_object('games_rated', v_games, 'active_players', v_players, 'profiles_changed', v_changed);
@@ -184,6 +212,34 @@ update public.player_achievements set target = 1400 where achievement_key = 'tit
 update public.player_achievements set target = 1550 where achievement_key = 'title_fm' and target <> 1550;
 update public.player_achievements set target = 1700 where achievement_key = 'title_fim' and target <> 1700;
 update public.player_achievements set target = 1800 where achievement_key = 'title_fgm' and target <> 1800;
+
+-- Directly unlock title achievement badges for all existing titled members
+insert into public.player_achievements (player_id, achievement_key, earned_at, progress, target, updated_at)
+select p.id,
+       t.key,
+       coalesce(pa.earned_at, p.created_at, now()),
+       greatest(coalesce(pa.progress, 0), t.target),
+       t.target,
+       now()
+  from public.profiles p
+ cross join (
+   values
+     ('title_fcm', 1, 1400),
+     ('title_fm',  2, 1550),
+     ('title_fim', 3, 1700),
+     ('title_fgm', 4, 1800)
+ ) as t(key, rank, target)
+  left join public.player_achievements pa on pa.player_id = p.id and pa.achievement_key = t.key
+ where not p.is_immortal
+   and (
+     public.title_rank(p.earned_title) >= t.rank
+     or greatest(coalesce(p.peak_blitz_elo, 0), coalesce(p.peak_rapid_elo, 0), coalesce(p.peak_bullet_elo, 0), coalesce(p.peak_classical_elo, 0)) >= t.target
+   )
+on conflict (player_id, achievement_key) do update
+   set earned_at = coalesce(player_achievements.earned_at, excluded.earned_at),
+       progress = greatest(player_achievements.progress, excluded.progress),
+       target = excluded.target,
+       updated_at = now();
 
 -- Immediately evaluate and award eligible titles
 select public.recalculate_ratings();
