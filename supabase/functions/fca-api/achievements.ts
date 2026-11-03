@@ -62,10 +62,10 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { key: 'rating_1300', name: 'Rising Star', description: 'Reach a 1300 rating in any time control.', category: 'Rating', tier: 'bronze', icon: 'Star', target: 1300 },
   { key: 'rating_1400', name: '1400 Club', description: 'Reach a 1400 rating in any time control.', category: 'Rating', tier: 'silver', icon: 'Sparkle', target: 1400 },
   { key: 'rating_1500', name: '1500 Club', description: 'Reach a 1500 rating in any time control.', category: 'Rating', tier: 'gold', icon: 'MountainSnow', target: 1500 },
-  { key: 'title_fcm', name: 'Candidate Master', description: 'Earn the FCM title (peak 1600).', category: 'Rating', tier: 'gold', icon: 'GraduationCap', target: 1600 },
-  { key: 'title_fm', name: 'FCA Master', description: 'Earn the FM title (peak 1800).', category: 'Rating', tier: 'platinum', icon: 'Medal', target: 1800 },
-  { key: 'title_fim', name: 'International Master', description: 'Earn the FIM title (peak 2000).', category: 'Rating', tier: 'legendary', icon: 'Globe', target: 2000 },
-  { key: 'title_fgm', name: 'Grandmaster', description: 'Earn the FGM title (peak 2200).', category: 'Rating', tier: 'legendary', icon: 'Crown', target: 2200 },
+  { key: 'title_fcm', name: 'Candidate Master', description: 'Earn the FCM title (peak 1400).', category: 'Rating', tier: 'gold', icon: 'GraduationCap', target: 1400 },
+  { key: 'title_fm', name: 'FCA Master', description: 'Earn the FM title (peak 1550).', category: 'Rating', tier: 'platinum', icon: 'Medal', target: 1550 },
+  { key: 'title_fim', name: 'International Master', description: 'Earn the FIM title (peak 1700).', category: 'Rating', tier: 'legendary', icon: 'Globe', target: 1700 },
+  { key: 'title_fgm', name: 'Grandmaster', description: 'Earn the FGM title (peak 1800).', category: 'Rating', tier: 'legendary', icon: 'Crown', target: 1800 },
   { key: 'rocket_50', name: 'Rocket', description: 'Gain 50+ rating points in a single event.', category: 'Rating', tier: 'silver', icon: 'TrendingUp', target: 50 },
   { key: 'rocket_100', name: 'Comet', description: 'Gain 100+ rating points in a single event.', category: 'Rating', tier: 'gold', icon: 'Rocket', target: 100 },
 
@@ -224,8 +224,8 @@ function awardThresholds(s: PlayerState, prefix: string, steps: number[], value:
   for (const n of steps) if (value >= n) award(s, `${prefix}${n}`, at, ctx);
 }
 
-const TITLE_STEPS: Array<[number, string]> = [[1600, 'title_fcm'], [1800, 'title_fm'], [2000, 'title_fim'], [2200, 'title_fgm']];
-const TITLE_MIN_RATING: Record<string, number> = { FCM: 1600, FM: 1800, FIM: 2000, FGM: 2200 };
+const TITLE_STEPS: Array<[number, string]> = [[1400, 'title_fcm'], [1550, 'title_fm'], [1700, 'title_fim'], [1800, 'title_fgm']];
+const TITLE_MIN_RATING: Record<string, number> = { FCM: 1400, FM: 1550, FIM: 1700, FGM: 1800 };
 
 export function computeAchievements(input: {
   profiles: AchProfile[];

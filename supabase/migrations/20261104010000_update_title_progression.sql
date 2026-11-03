@@ -179,3 +179,10 @@ begin
   return jsonb_build_object('games_rated', v_games, 'active_players', v_players, 'profiles_changed', v_changed);
 end $$;
 
+-- Align target thresholds in player_achievements table
+update public.player_achievements set target = 1400 where achievement_key = 'title_fcm' and target <> 1400;
+update public.player_achievements set target = 1550 where achievement_key = 'title_fm' and target <> 1550;
+update public.player_achievements set target = 1700 where achievement_key = 'title_fim' and target <> 1700;
+update public.player_achievements set target = 1800 where achievement_key = 'title_fgm' and target <> 1800;
+
+
