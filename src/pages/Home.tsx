@@ -208,7 +208,7 @@ export default function Home() {
       {/* Recent badges */}
       {data && data.badges.length > 0 && (
         <section>
-          <SectionHeader title={<span className="flex items-center gap-2"><Sparkles className="h-4 w-4 text-yellow-400" /> Fresh badges</span>} subtitle="Achievements members just unlocked" to="/achievements" />
+          <SectionHeader title={<span className="flex items-center gap-2">Fresh badges</span>} subtitle="Achievements members just unlocked" to="/achievements" />
           <div className="no-scrollbar -mx-4 flex gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-4 sm:px-0">
             {data.badges.map((b) => {
               const def = ACHIEVEMENT_MAP[b.achievement_key];
