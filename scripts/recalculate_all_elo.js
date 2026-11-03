@@ -20,11 +20,22 @@ function calculateElo(ratingA, ratingB, scoreA, kA = 20, kB = 20) {
   return { newA: Math.max(100, newA), newB: Math.max(100, newB) };
 }
 
+const TITLE_RANKS = { NONE: 0, FCM: 1, FM: 2, FIM: 3, FGM: 4, FET: 5 };
+
+function getTitleForStats({ peakElo, totalGames, fcaPodiums = 0, fcaWins = 0 }) {
+  if (totalGames < 25) return 'NONE';
+  if (peakElo >= 1800 && fcaWins >= 3) return 'FGM';
+  if (peakElo >= 1700 && fcaPodiums >= 5) return 'FIM';
+  if (peakElo >= 1550) return 'FM';
+  if (peakElo >= 1400) return 'FCM';
+  return 'NONE';
+}
+
 function getTitleForRating(peakElo) {
-  if (peakElo >= 2200) return 'FGM';
-  if (peakElo >= 2000) return 'FIM';
-  if (peakElo >= 1800) return 'FM';
-  if (peakElo >= 1600) return 'FCM';
+  if (peakElo >= 1800) return 'FGM';
+  if (peakElo >= 1700) return 'FIM';
+  if (peakElo >= 1550) return 'FM';
+  if (peakElo >= 1400) return 'FCM';
   return 'NONE';
 }
 
@@ -145,7 +156,8 @@ async function runRecalculation() {
           pStats.CLASSICAL.peak
         );
 
-        const title = getTitleForRating(maxPeak);
+        const totalGames = pStats.BLITZ.games + pStats.RAPID.games + pStats.BULLET.games + pStats.CLASSICAL.games;
+        const newTitle = getTitleForStats({ peakElo: maxPeak, totalGames });
 
         const updatePayload = {
           blitz_elo: pStats.BLITZ.elo,
@@ -165,8 +177,11 @@ async function runRecalculation() {
           peak_classical_elo: pStats.CLASSICAL.peak,
         };
 
-        if (title !== 'NONE' && !pStats.is_immortal) {
-          updatePayload.earned_title = title;
+        const currentRank = TITLE_RANKS[pStats.earned_title] || 0;
+        const newRank = TITLE_RANKS[newTitle] || 0;
+
+        if (newRank > currentRank && !pStats.is_immortal) {
+          updatePayload.earned_title = newTitle;
         }
 
         return supabase.from('profiles').update(updatePayload).eq('id', profId);

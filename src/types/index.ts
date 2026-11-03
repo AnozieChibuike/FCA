@@ -250,13 +250,23 @@ export const ROLE_CONFIG: Record<UserRole, { label: string; color: string; bg: s
   PLAYER: { label: 'Player', color: 'text-text-muted', bg: 'bg-surface' },
 };
 
-export const TITLE_CONFIG: Record<FcaTitle, { label: string; tag: string; threshold: number | null; color: string; bg: string }> = {
-  NONE: { label: 'Unrated', tag: '', threshold: null, color: 'text-text-muted', bg: 'bg-transparent border-transparent' },
-  FCM: { label: 'FCA Candidate Master', tag: 'FCM', threshold: 1600, color: 'text-sky-300', bg: 'bg-sky-950/90 text-sky-300 border border-sky-500/80 font-bold' },
-  FM: { label: 'FCA Master', tag: 'FM', threshold: 1800, color: 'text-emerald-300', bg: 'bg-emerald-950/90 text-emerald-300 border border-emerald-500/80 font-bold' },
-  FIM: { label: 'FCA International Master', tag: 'FIM', threshold: 2000, color: 'text-amber-300', bg: 'bg-amber-950/90 text-amber-300 border border-amber-500/80 font-bold shadow-[0_0_8px_rgba(245,158,11,0.2)]' },
-  FGM: { label: 'FCA Grandmaster', tag: 'FGM', threshold: 2200, color: 'text-rose-300', bg: 'bg-rose-950/90 text-rose-300 border border-rose-500/80 font-bold shadow-[0_0_8px_rgba(244,63,94,0.3)]' },
-  FET: { label: 'FCA Eternal', tag: 'FET', threshold: null, color: 'text-purple-300', bg: 'fet-shimmer-badge' },
+export const TITLE_CONFIG: Record<FcaTitle, {
+  label: string;
+  tag: string;
+  threshold: number | null;
+  minGames?: number;
+  podiumsNeeded?: number;
+  winsNeeded?: number;
+  reqText: string;
+  color: string;
+  bg: string;
+}> = {
+  NONE: { label: 'Unrated', tag: '', threshold: null, reqText: 'Default status', color: 'text-text-muted', bg: 'bg-transparent border-transparent' },
+  FCM: { label: 'FCA Candidate Master', tag: 'FCM', threshold: 1400, minGames: 25, reqText: '1400+ peak Elo & 25+ rated games', color: 'text-sky-300', bg: 'bg-sky-950/90 text-sky-300 border border-sky-500/80 font-bold' },
+  FM: { label: 'FCA Master', tag: 'FM', threshold: 1550, minGames: 25, reqText: '1550+ peak Elo & 25+ rated games', color: 'text-emerald-300', bg: 'bg-emerald-950/90 text-emerald-300 border border-emerald-500/80 font-bold' },
+  FIM: { label: 'FCA International Master', tag: 'FIM', threshold: 1700, minGames: 25, podiumsNeeded: 5, reqText: '1700+ peak Elo, 5 FCA Podiums & 25+ rated games', color: 'text-amber-300', bg: 'bg-amber-950/90 text-amber-300 border border-amber-500/80 font-bold shadow-[0_0_8px_rgba(245,158,11,0.2)]' },
+  FGM: { label: 'FCA Grandmaster', tag: 'FGM', threshold: 1800, minGames: 25, winsNeeded: 3, reqText: '1800+ peak Elo, 3 FCA Wins & 25+ rated games', color: 'text-rose-300', bg: 'bg-rose-950/90 text-rose-300 border border-rose-500/80 font-bold shadow-[0_0_8px_rgba(244,63,94,0.3)]' },
+  FET: { label: 'FCA Eternal', tag: 'FET', threshold: null, reqText: 'Honorary • In Memoriam', color: 'text-purple-300', bg: 'fet-shimmer-badge' },
 };
 
 export const MODES: GameMode[] = ['BLITZ', 'RAPID', 'BULLET', 'CLASSICAL'];

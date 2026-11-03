@@ -13,6 +13,7 @@ import { formatDate, ordinal, plural, shortEventName } from '../lib/format';
 import type { Game, GameMode, PlayerAchievement, Profile as ProfileType, Standing } from '../types';
 import { TITLE_CONFIG, modeRating, totalGames } from '../types';
 import { ModeCards, PerformanceStats, RatingHistory, RecentForm, outcomeFor } from '../components/profile/RatingPanel';
+import TitleProgressPill from '../components/profile/TitleProgressPill';
 import MatchList from '../components/profile/MatchList';
 import EditProfileSheet from '../components/profile/EditProfileSheet';
 import OnboardingChecklist from '../components/profile/OnboardingChecklist';
@@ -210,6 +211,7 @@ export default function Profile() {
       {!immortal && (
         <>
           <ModeCards player={player} mode={mode} onMode={setMode} />
+          <TitleProgressPill player={player} events={events} />
 
           <Segmented
             value={tab}
