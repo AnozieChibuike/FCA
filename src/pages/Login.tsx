@@ -1,366 +1,108 @@
 import { useState } from 'react';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { LogIn, AlertTriangle, Eye, EyeOff, UserPlus, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Eye, EyeOff, AlertTriangle, LogIn, Mail } from 'lucide-react';
 import { useAuth } from '../lib/auth';
-import { FUTO_FACULTIES } from '../data/futoData';
-import fcaLogo from '../assets/logo.png';
+import { supabase } from '../lib/supabase';
+import { linkPendingLichess } from '../lib/onboarding';
+import { Card, Spinner } from '../components/ui/misc';
+import Sheet from '../components/ui/Sheet';
+import { useToast } from '../components/ui/Toast';
+import fcaLogo from '../assets/logo-128.png';
 
 export default function Login() {
-  const [searchParams] = useSearchParams();
-  const inviteToken = searchParams.get('invite');
-  const invitedRole = searchParams.get('role');
-
-  const [mode, setMode] = useState<'login' | 'signup'>(inviteToken ? 'signup' : 'login');
-  const [signupStep, setSignupStep] = useState<1 | 2>(1);
-
-  // Base Auth state
+  const [params] = useSearchParams();
+  const navigate = useNavigate();
+  const toast = useToast();
+  const { signIn } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-
-  // Profile metadata state
-  const [fullName, setFullName] = useState('');
-  const [regNumber, setRegNumber] = useState('');
-  const [department, setDepartment] = useState('');
-  const [faculty, setFaculty] = useState('');
-  const [gender, setGender] = useState('');
-  const [isAlumni, setIsAlumni] = useState(false);
-
-  const [loading, setLoading] = useState(false);
+  const [show, setShow] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetSent, setResetSent] = useState(false);
+  const next = params.get('next');
 
-  const { signIn, signUp } = useAuth();
-  const navigate = useNavigate();
-
-  const handleNextStep = (e: React.FormEvent) => {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!fullName || !regNumber || !department || !faculty || !email) {
-      setError('Please fill in all fields to continue.');
+    setError('');
+    setBusy(true);
+    const { error: err } = await signIn(email, password);
+    if (err) {
+      setBusy(false);
+      setError(/invalid/i.test(err.message) ? 'Wrong email or password.' : err.message);
       return;
     }
-    setError('');
-    setSignupStep(2);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-
-    if (mode === 'login') {
-      const { error } = await signIn(email, password);
-      if (error) {
-        setError(error.message);
-        setLoading(false);
-        return;
-      }
-      setLoading(false);
-      navigate('/profile');
-    } else {
-      if (password !== confirmPassword) {
-        setError('Passwords do not match.');
-        setLoading(false);
-        return;
-      }
-
-      const fcaId = `FCA-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9000) + 1000)}`;
-
-      const metadata: Record<string, unknown> = {
-        full_name: fullName,
-        reg_number: regNumber,
-        department,
-        faculty,
-        gender: gender || null,
-        is_alumni: isAlumni,
-        fca_id: fcaId,
-      };
-
-      if (invitedRole === 'ADMIN') {
-        metadata.is_admin = true;
-        metadata.status = 'APPROVED';
-      } else if (invitedRole === 'ARBITER') {
-        metadata.is_arbiter = true;
-        metadata.status = 'APPROVED';
-      } else {
-        metadata.status = 'PENDING';
-      }
-
-      const { error } = await signUp(email, password, metadata);
-      if (error) {
-        setError(error.message);
-        setLoading(false);
-        return;
-      }
-      setLoading(false);
-      navigate('/profile');
+    try {
+      const linked = await linkPendingLichess();
+      if (linked) toast(`Lichess @${linked.username} connected`);
+    } catch (e2) {
+      toast(e2 instanceof Error ? e2.message : 'Could not link Lichess', 'error');
     }
-  };
+    setBusy(false);
+    navigate(next && next.startsWith('/') ? next : '/');
+  }
+
+  async function sendReset(e: React.FormEvent) {
+    e.preventDefault();
+    await supabase.auth.resetPasswordForEmail(resetEmail.trim(), { redirectTo: `${window.location.origin}/reset-password` });
+    setResetSent(true);
+  }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 pt-24 sm:pt-28 pb-12">
-      <div className="bg-surface border border-chess-border p-5 sm:p-8 rounded-lg shadow-card w-full max-w-md">
-        <div className="text-center mb-6">
-          <img src={fcaLogo} alt="FCA Logo" className="w-12 h-12 object-contain mx-auto mb-3" />
-          <h1 className="font-extrabold text-xl sm:text-2xl text-white">
-            {mode === 'login' ? 'Welcome Back' : 'Become an FCA Player'}
-          </h1>
-          {inviteToken && (
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-primary/20 border border-primary/30 text-primary-light text-xs font-semibold mt-2">
-              Invited as {invitedRole}
-            </div>
-          )}
-          <p className="text-text-muted text-xs mt-2 font-medium">
-            {mode === 'login'
-              ? 'Sign in to access your FCA Chess account'
-              : (signupStep === 1 ? 'Step 1: Player Information' : 'Step 2: Account Security')}
-          </p>
-        </div>
-
+    <div className="page flex max-w-md flex-col py-8">
+      <div className="mb-6 text-center">
+        <img src={fcaLogo} alt="" className="mx-auto mb-3 h-12 w-12 object-contain" />
+        <h1 className="text-2xl font-extrabold text-white">Welcome back</h1>
+        <p className="mt-1 text-sm text-text-muted">Sign in to your FCA account</p>
+      </div>
+      <Card className="p-4 sm:p-6">
         {error && (
-          <div className="flex items-center gap-2 p-3 rounded bg-red-950/60 border border-red-800 text-red-400 text-xs font-semibold mb-5">
-            <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-            {error}
+          <div className="mb-4 flex items-start gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-200">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /> {error}
           </div>
         )}
-
-        {mode === 'login' ? (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label htmlFor="email" className="block text-xs font-semibold text-white uppercase tracking-wider mb-1.5">
-                Email Address
-              </label>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="input-field"
-                placeholder="you@example.com"
-                required
-              />
-            </div>
-
-            <div>
-              <label htmlFor="password" className="block text-xs font-semibold text-white uppercase tracking-wider mb-1.5">
-                Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="input-field"
-                placeholder="••••••••"
-                required
-                minLength={6}
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full btn-primary min-h-[46px] flex items-center justify-center gap-2 text-sm sm:text-base font-bold disabled:opacity-50 disabled:cursor-not-allowed mt-2"
-            >
-              {loading ? (
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : (
-                <>
-                  <LogIn className="w-4 h-4" />
-                  Sign In
-                </>
-              )}
-            </button>
-          </form>
-        ) : (
-          /* Signup Form */
-          signupStep === 1 ? (
-            <form onSubmit={handleNextStep} className="space-y-3.5">
-              <div>
-                <label className="block text-xs font-semibold text-white uppercase tracking-wider mb-1">Full Name</label>
-                <input
-                  type="text"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  className="input-field"
-                  placeholder="e.g. Magnus Carlsen"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-white uppercase tracking-wider mb-1">Faculty / School</label>
-                <select
-                  value={faculty}
-                  onChange={(e) => {
-                    setFaculty(e.target.value);
-                    setDepartment('');
-                  }}
-                  className="input-field cursor-pointer appearance-none"
-                  required
-                >
-                  <option value="">Select School/Faculty...</option>
-                  {FUTO_FACULTIES.map((fac) => (
-                    <option key={fac.code} value={fac.code}>{fac.code} - {fac.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-white uppercase tracking-wider mb-1">Department</label>
-                <select
-                  value={department}
-                  onChange={(e) => setDepartment(e.target.value)}
-                  className="input-field cursor-pointer appearance-none"
-                  required
-                  disabled={!faculty}
-                >
-                  <option value="">{faculty ? 'Select Department...' : 'First Select a Faculty/School...'}</option>
-                  {FUTO_FACULTIES.find(f => f.code === faculty)?.departments.map((dept) => (
-                    <option key={dept} value={dept}>{dept}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-white uppercase tracking-wider mb-1">Registration Number</label>
-                <input
-                  type="text"
-                  value={regNumber}
-                  onChange={(e) => setRegNumber(e.target.value)}
-                  className="input-field"
-                  placeholder="e.g., 20221234567"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-white uppercase tracking-wider mb-1">Gender (Optional)</label>
-                <select
-                  value={gender}
-                  onChange={(e) => setGender(e.target.value)}
-                  className="input-field cursor-pointer appearance-none"
-                >
-                  <option value="">Prefer not to say / Unspecified</option>
-                  <option value="MALE">Male</option>
-                  <option value="FEMALE">Female</option>
-                </select>
-              </div>
-
-              <div className="flex items-center gap-2.5 pt-1">
-                <input
-                  type="checkbox"
-                  id="isAlumni"
-                  checked={isAlumni}
-                  onChange={(e) => setIsAlumni(e.target.checked)}
-                  className="w-4 h-4 rounded bg-surface border-chess-border text-primary focus:ring-primary cursor-pointer"
-                />
-                <label htmlFor="isAlumni" className="text-xs font-semibold text-white cursor-pointer select-none">
-                  🎓 I am a FUTO Alumni
-                </label>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-white uppercase tracking-wider mb-1">Email Address</label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="input-field"
-                  placeholder="you@example.com"
-                  required
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="w-full btn-primary min-h-[46px] flex items-center justify-center gap-2 text-sm sm:text-base font-bold mt-4"
-              >
-                Next Step <ArrowRight className="w-4 h-4" />
+        <form onSubmit={submit} className="space-y-4">
+          <label className="block">
+            <span className="field-label">Email</span>
+            <input className="input-field" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" autoCapitalize="none" required />
+          </label>
+          <label className="block">
+            <span className="mb-1.5 flex items-center justify-between">
+              <span className="text-xs font-semibold text-text-muted">Password</span>
+              <button type="button" onClick={() => { setResetEmail(email); setResetSent(false); setForgotOpen(true); }} className="text-xs font-semibold text-primary">Forgot password?</button>
+            </span>
+            <span className="relative block">
+              <input className="input-field !pr-12" type={show ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
+              <button type="button" onClick={() => setShow(!show)} className="absolute right-1 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center text-text-muted" aria-label={show ? 'Hide password' : 'Show password'}>
+                {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
-            </form>
-          ) : (
-            <form onSubmit={handleSubmit} className="space-y-3.5">
-              <div>
-                <label className="block text-xs font-semibold text-white uppercase tracking-wider mb-1">Password</label>
-                <div className="relative">
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="input-field pr-12"
-                    placeholder="••••••••"
-                    required
-                    minLength={6}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-1 top-1/2 -translate-y-1/2 min-w-[44px] min-h-[44px] text-text-muted hover:text-white transition-colors flex items-center justify-center cursor-pointer"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
+            </span>
+          </label>
+          <button type="submit" disabled={busy} className="btn-primary w-full">{busy ? <Spinner className="h-4 w-4" /> : <><LogIn className="h-4 w-4" /> Sign in</>}</button>
+        </form>
+      </Card>
+      <p className="mt-5 text-center text-sm text-text-muted">
+        New to FCA? <Link to="/join" className="font-semibold text-primary">Create an account</Link>
+      </p>
 
-              <div>
-                <label className="block text-xs font-semibold text-white uppercase tracking-wider mb-1">Confirm Password</label>
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="input-field"
-                  placeholder="••••••••"
-                  required
-                  minLength={6}
-                />
-              </div>
-
-              <div className="flex gap-2.5 mt-5">
-                <button
-                  type="button"
-                  onClick={() => setSignupStep(1)}
-                  className="btn-secondary min-h-[46px] flex items-center justify-center gap-1.5 px-4"
-                >
-                  <ArrowLeft className="w-4 h-4" /> Back
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="flex-1 btn-primary min-h-[46px] flex items-center justify-center gap-2 text-sm sm:text-base font-bold disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {loading ? (
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  ) : (
-                    <>
-                      <UserPlus className="w-4 h-4" />
-                      Create Account
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
-          )
+      <Sheet open={forgotOpen} onClose={() => setForgotOpen(false)} title="Reset your password">
+        {resetSent ? (
+          <div className="space-y-3 text-sm">
+            <p className="flex items-start gap-2 text-white"><Mail className="mt-0.5 h-4 w-4 shrink-0 text-primary" /> If an account exists for {resetEmail}, a reset link is on its way. Check spam too.</p>
+            <p className="text-text-muted">No email after a few minutes? Message an FCA admin on WhatsApp — they can send you a reset link directly from the console.</p>
+          </div>
+        ) : (
+          <form onSubmit={sendReset} className="space-y-4">
+            <label className="block">
+              <span className="field-label">Your account email</span>
+              <input className="input-field" type="email" value={resetEmail} onChange={(e) => setResetEmail(e.target.value)} required autoCapitalize="none" />
+            </label>
+            <button className="btn-primary w-full" type="submit">Send reset link</button>
+          </form>
         )}
-
-        <div className="mt-6 pt-5 border-t border-chess-border text-center">
-          <button
-            onClick={() => {
-              setMode(mode === 'login' ? 'signup' : 'login');
-              setSignupStep(1);
-              setError('');
-            }}
-            className="text-text-muted text-xs hover:text-white transition-colors cursor-pointer font-semibold"
-          >
-            {mode === 'login'
-              ? "Don't have an account? Sign up"
-              : 'Already have an account? Sign in'}
-          </button>
-        </div>
-
-        <div className="mt-3 text-center">
-          <Link to="/" className="text-text-muted text-xs hover:text-white transition-colors cursor-pointer">
-            Return to Home
-          </Link>
-        </div>
-      </div>
+      </Sheet>
     </div>
   );
 }

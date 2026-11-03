@@ -27,7 +27,7 @@ export default function Memorial() {
   };
 
   return (
-    <div className="min-h-screen px-3 sm:px-6 pt-20 sm:pt-28 pb-12 sm:pb-16">
+    <div className="min-h-screen px-4 sm:px-6 pt-6 sm:pt-10 pb-12 sm:pb-16">
       <div className="max-w-4xl mx-auto space-y-6 sm:space-y-8">
         
         {/* Hero Card / Profile Header */}

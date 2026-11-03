@@ -5,7 +5,7 @@ const titleEntries = Object.entries(TITLE_CONFIG).filter(([key]) => key !== 'NON
 
 export default function About() {
   return (
-    <div className="min-h-screen px-4 sm:px-6 pt-24 sm:pt-28 pb-12 sm:pb-16">
+    <div className="min-h-screen px-4 sm:px-6 pt-6 sm:pt-10 pb-12 sm:pb-16">
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-8 sm:mb-12">
           <BookOpen className="w-9 h-9 sm:w-10 sm:h-10 text-primary mx-auto mb-3 sm:mb-4" />
@@ -53,7 +53,7 @@ export default function About() {
                       {key === 'FET' ? (
                         <span className="text-purple-400 text-xs font-medium">Unattainable (In Memoriam)</span>
                       ) : (
-                        <span className="text-neon-green text-xs font-medium">Attainable</span>
+                        <span className="text-emerald-400 text-xs font-medium">Attainable</span>
                       )}
                     </td>
                   </tr>
@@ -112,16 +112,16 @@ export default function About() {
           </div>
         </div>
 
-        <div className="glass-card p-8">
+        <div className="glass-card p-5 sm:p-8 mb-6 sm:mb-8">
           <h2 className="font-heading text-xl tracking-wider mb-4">Game Modes</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="p-4 rounded-lg bg-surface/50">
               <h3 className="font-medium text-text mb-1">Blitz</h3>
-              <p className="text-text-muted text-xs">3+2 time control. Fast-paced tactical battles.</p>
+              <p className="text-text-muted text-xs">3–5 minute games. Titled Tuesday is 3+0 blitz.</p>
             </div>
             <div className="p-4 rounded-lg bg-surface/50">
               <h3 className="font-medium text-text mb-1">Rapid</h3>
-              <p className="text-text-muted text-xs">15+10 time control. Strategic depth with思考 time.</p>
+              <p className="text-text-muted text-xs">15+10 time control. Strategic depth with time to think.</p>
             </div>
             <div className="p-4 rounded-lg bg-surface/50">
               <h3 className="font-medium text-text mb-1">Bullet</h3>
@@ -133,7 +133,32 @@ export default function About() {
             </div>
           </div>
         </div>
+
+        <div className="glass-card p-5 sm:p-8">
+          <h2 className="font-heading text-xl tracking-wider mb-4">FAQ</h2>
+          <div className="divide-y divide-chess-border">
+            {FAQ.map(([q, a]) => (
+              <details key={q} className="group py-3">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-white">
+                  {q}
+                  <span className="text-text-muted transition-transform group-open:rotate-45">+</span>
+                </summary>
+                <p className="mt-2 text-sm text-text-muted">{a}</p>
+              </details>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
 }
+
+const FAQ: Array<[string, string]> = [
+  ['How do I get an FCA rating?', 'Create a free account, connect your Lichess account, and play the Titled Tuesday arena (every Tuesday, 8:30 PM). Every game you play against another FCA member is rated once an arbiter approves the import.'],
+  ['Why is a game missing from my profile?', 'Only games where both players have linked Lichess accounts are rated. If you linked Lichess after playing, the site finds those past games automatically and queues them for an arbiter to approve.'],
+  ['When do ratings update?', "The site checks Lichess every 15 minutes. Once an arena finishes it's queued for one-click approval, and ratings, titles and badges update as soon as an arbiter approves it."],
+  ['How are titles earned?', 'Titles are awarded automatically when your peak rating crosses a threshold (FCM 1600, FM 1800, FIM 2000, FGM 2200) in any time control, and you keep them for life.'],
+  ['What are badges and season points?', 'Badges reward milestones like win streaks, upsets and Titled Tuesday attendance. Season points come from your finishing position among FCA members in each arena, plus a point for turning up.'],
+  ['Can I play over the board?', 'Yes. Arbiters log over-the-board games on campus, and they count towards your rating like online games.'],
+  ['I forgot my password', 'Use "Forgot password?" on the sign-in page. If the email doesn\'t arrive, any FCA admin can send you a one-time reset link from the console.'],
+];

@@ -1,473 +1,252 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import {
-  Users, Swords, Trophy, Zap, ArrowRight, Crown, GraduationCap, User
-} from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { ArrowRight, Users, Swords, CalendarDays, Activity, Crown, GraduationCap, Sparkles, Trophy, Share2, CheckCircle2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import fcaLogo from '../assets/logo.png';
+import { useAuth } from '../lib/auth';
+import {
+  PROFILE_COLUMNS, fetchLatestCompletedEvent, fetchNextEvent, fetchRecentBadges, fetchSeasonStandings, fetchStandings,
+  type EarnedBadge,
+} from '../lib/api';
+import { inviteUrl, shareLink } from '../lib/share';
+import { timeAgo } from '../lib/format';
+import type { Profile, SeasonStanding, Standing, TournamentSummary } from '../types';
+import { NextEventCard, ResultsCard } from '../components/events/EventBits';
+import { ACHIEVEMENT_MAP, BadgeMedal } from '../components/achievements/Badges';
+import { Avatar, TitleBadge } from '../components/ui/Avatar';
+import { Card, SectionHeader, Skeleton, StatTile } from '../components/ui/misc';
+import { useToast } from '../components/ui/Toast';
+import OnboardingChecklist from '../components/profile/OnboardingChecklist';
 import MemorialBanner from '../components/MemorialBanner';
-import { TITLE_CONFIG, type Profile } from '../types';
-import PastTournaments from '../components/PastTournaments';
-import UpcomingEvents from '../components/UpcomingEvents';
+import fcaLogo from '../assets/logo-128.png';
 
-interface CategoryLeader {
-  player: Profile;
-  winRate: number;
-  totalGames: number;
+interface HomeData {
+  next: TournamentSummary | null;
+  latest: TournamentSummary | null;
+  latestStandings: Standing[];
+  top: Profile[];
+  leaders: Array<{ label: string; icon: typeof Crown; player: Profile | null }>;
+  badges: EarnedBadge[];
+  season: SeasonStanding[];
+  counts: { members: number; games: number; events: number; active: number };
+}
+
+async function loadHome(): Promise<HomeData> {
+  const approved = () => supabase.from('profiles').select(PROFILE_COLUMNS).eq('status', 'APPROVED').eq('is_immortal', false).gt('blitz_games', 0).order('blitz_elo', { ascending: false });
+  const monthAgo = new Date(Date.now() - 30 * 86_400_000).toISOString();
+
+  const [next, latest, top, student, female, alumni, badges, season, members, games, events, recent] = await Promise.all([
+    fetchNextEvent(),
+    fetchLatestCompletedEvent(),
+    approved().limit(5),
+    approved().eq('is_alumni', false).limit(1),
+    approved().eq('gender', 'FEMALE').limit(1),
+    approved().eq('is_alumni', true).limit(1),
+    fetchRecentBadges(8),
+    fetchSeasonStandings().catch(() => [] as SeasonStanding[]),
+    supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('status', 'APPROVED').eq('is_immortal', false),
+    supabase.from('games').select('id', { count: 'exact', head: true }),
+    supabase.from('tournaments').select('id', { count: 'exact', head: true }).eq('status', 'COMPLETED'),
+    supabase.from('games').select('white_player_id, black_player_id').gte('played_at', monthAgo).limit(1000),
+  ]);
+
+  const active = new Set<string>();
+  for (const g of (recent.data ?? []) as Array<{ white_player_id: string; black_player_id: string }>) {
+    active.add(g.white_player_id);
+    active.add(g.black_player_id);
+  }
+  const latestStandings = latest ? await fetchStandings(latest.id).catch(() => []) : [];
+  const topList = (top.data ?? []) as unknown as Profile[];
+
+  return {
+    next,
+    latest,
+    latestStandings,
+    top: topList,
+    leaders: [
+      { label: 'Top student', icon: GraduationCap, player: ((student.data ?? [])[0] as unknown as Profile) ?? null },
+      { label: 'Top female', icon: Crown, player: ((female.data ?? [])[0] as unknown as Profile) ?? null },
+      { label: 'Top alumni', icon: GraduationCap, player: ((alumni.data ?? [])[0] as unknown as Profile) ?? null },
+    ],
+    badges,
+    season: season.slice(0, 5),
+    counts: { members: members.count ?? 0, games: games.count ?? 0, events: events.count ?? 0, active: active.size },
+  };
 }
 
 export default function Home() {
-  const navigate = useNavigate();
-  const [stats, setStats] = useState({
-    totalPlayers: 0,
-    totalGames: 0,
-    numberOne: null as CategoryLeader | null,
-    topStudent: null as CategoryLeader | null,
-    topFemale: null as CategoryLeader | null,
-    topAlumni: null as CategoryLeader | null,
-  });
-  const [loading, setLoading] = useState(true);
+  const { profile } = useAuth();
+  const toast = useToast();
+  const [data, setData] = useState<HomeData | null>(null);
 
   useEffect(() => {
-    async function getLeaderInfo(query: any): Promise<CategoryLeader | null> {
-      const { data: player } = await query.limit(1).maybeSingle();
-      if (!player) return null;
-
-      const { data: games } = await supabase
-        .from('games')
-        .select('white_player_id, black_player_id, result')
-        .or(`white_player_id.eq.${player.id},black_player_id.eq.${player.id}`);
-
-      const totalGames = games ? games.length : 0;
-      let wins = 0;
-
-      if (games) {
-        games.forEach((g: any) => {
-          if (g.white_player_id === player.id && Number(g.result) === 1) wins++;
-          if (g.black_player_id === player.id && Number(g.result) === 0) wins++;
-        });
-      }
-
-      const winRate = totalGames > 0 ? Math.round((wins / totalGames) * 100) : 0;
-      return { player: player as Profile, winRate, totalGames };
-    }
-
-    async function fetchStats() {
-      const { count } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
-      const { count: gameCount } = await supabase.from('games').select('*', { count: 'exact', head: true });
-
-      const [numberOne, topStudent, topFemale, topAlumni] = await Promise.all([
-        // #1 Overall Player
-        getLeaderInfo(
-          supabase.from('profiles').select('*').eq('status', 'APPROVED').eq('is_immortal', false).order('blitz_elo', { ascending: false })
-        ),
-        // Top Student (is_alumni = false)
-        getLeaderInfo(
-          supabase.from('profiles').select('*').eq('status', 'APPROVED').eq('is_immortal', false).eq('is_alumni', false).order('blitz_elo', { ascending: false })
-        ),
-        // Top Female (gender = 'FEMALE')
-        getLeaderInfo(
-          supabase.from('profiles').select('*').eq('status', 'APPROVED').eq('is_immortal', false).eq('gender', 'FEMALE').order('blitz_elo', { ascending: false })
-        ),
-        // Top Alumni (is_alumni = true)
-        getLeaderInfo(
-          supabase.from('profiles').select('*').eq('status', 'APPROVED').eq('is_immortal', false).eq('is_alumni', true).order('blitz_elo', { ascending: false })
-        ),
-      ]);
-
-      setStats({
-        totalPlayers: count || 0,
-        totalGames: gameCount || 0,
-        numberOne,
-        topStudent,
-        topFemale,
-        topAlumni,
-      });
-      setLoading(false);
-    }
-    fetchStats();
+    loadHome().then(setData).catch(() => setData(null));
   }, []);
 
+  async function invite() {
+    if (!profile) return;
+    const outcome = await shareLink({
+      title: 'Join FCA Rated',
+      text: 'Play rated chess with the FUTO Chess Association. Join with my link:',
+      url: inviteUrl(profile.fca_id),
+    });
+    if (outcome === 'copied') toast('Invite link copied');
+  }
+
   return (
-    <div className="min-h-screen">
-      <section className="pt-24 sm:pt-28 pb-12 sm:pb-16 px-4 sm:px-6">
-        <div className="max-w-6xl mx-auto">
-          {/* Main Hero Header */}
-          <div className="text-center mb-8 sm:mb-12">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#262421] border border-chess-border text-white text-xs font-semibold mb-4 sm:mb-6 shadow-sm select-none">
-              <img src={fcaLogo} alt="FCA Logo" className="w-4 h-4 object-contain" />
-              <span>Official FUTO Chess Association Platform</span>
+    <div className="page space-y-6 sm:space-y-8">
+      {/* Hero */}
+      {profile ? (
+        <section className="flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-sm text-text-muted">Welcome back,</p>
+            <h1 className="truncate text-2xl font-extrabold text-white sm:text-3xl">{profile.full_name.split(' ')[0]} 👋</h1>
+          </div>
+          <Link to={`/profile/${profile.id}`} className="flex shrink-0 items-center gap-3 rounded-2xl border border-chess-border bg-surface px-3 py-2">
+            <div className="text-right">
+              <div className="text-[11px] text-text-muted">Blitz</div>
+              <div className="text-xl font-extrabold leading-none text-white tabular-nums">{profile.blitz_elo}</div>
             </div>
-
-            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white mb-4 sm:mb-5 leading-tight">
-              FUTO Chess Association
-            </h1>
-            <p className="text-text-muted text-sm sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
-              Track your chess ratings across Blitz, Rapid, Bullet, and Classical formats.
-              Compete with fellow students and claim your place on the campus leaderboards.
+            <Avatar src={profile.avatar_url} name={profile.full_name} size="md" />
+          </Link>
+        </section>
+      ) : (
+        <section className="relative overflow-hidden rounded-3xl border border-chess-border bg-surface px-5 py-8 text-center sm:px-10 sm:py-12">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(129,182,76,0.18),transparent_60%)]" />
+          <div className="relative">
+            <img src={fcaLogo} alt="" className="mx-auto mb-4 h-14 w-14 object-contain" />
+            <h1 className="text-balance text-3xl font-extrabold tracking-tight text-white sm:text-5xl">FUTO's home for rated chess</h1>
+            <p className="mx-auto mt-3 max-w-xl text-sm text-text-muted sm:text-base">
+              Play the Titled Tuesday arena every week, earn an official FCA rating and titles, collect badges and climb the campus rankings.
             </p>
-          </div>
-
-          {/* Overview Stats (Double Grid) */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 mb-8">
-            <div className="bg-surface border border-chess-border p-5 sm:p-6 rounded-xl flex items-center gap-4 shadow-card">
-              <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/30 flex items-center justify-center shrink-0">
-                <Users className="w-6 h-6 text-primary" />
-              </div>
-              <div>
-                <p className="text-2xl sm:text-3xl font-extrabold text-white leading-none mb-1">
-                  {loading ? '—' : stats.totalPlayers}
-                </p>
-                <p className="text-text-muted text-xs font-medium uppercase tracking-wider">Registered FCA Players</p>
-              </div>
-            </div>
-            
-            <div className="bg-surface border border-chess-border p-5 sm:p-6 rounded-xl flex items-center gap-4 shadow-card">
-              <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center shrink-0">
-                <Swords className="w-6 h-6 text-amber-400" />
-              </div>
-              <div>
-                <p className="text-2xl sm:text-3xl font-extrabold text-white leading-none mb-1">
-                  {loading ? '—' : stats.totalGames}
-                </p>
-                <p className="text-text-muted text-xs font-medium uppercase tracking-wider">Official Rating Games Logged</p>
-              </div>
+            <div className="mt-6 flex flex-col justify-center gap-2 sm:flex-row">
+              <Link to="/join" className="btn-primary !px-6">Join FCA — it's free <ArrowRight className="h-4 w-4" /></Link>
+              <Link to="/leaderboards" className="btn-secondary !px-6">See the rankings</Link>
             </div>
           </div>
+        </section>
+      )}
 
-          {/* Featured Category Leaders Grid (4 Cards Responsive Grid) */}
-          <div className="mb-10 sm:mb-14">
-            <div className="flex items-center justify-between gap-4 mb-4">
-              <div>
-                <h2 className="text-lg sm:text-xl font-extrabold text-white flex items-center gap-2">
-                  <span>Featured Category Leaders</span>
-                </h2>
-                <p className="text-text-muted text-xs">Top ranking active players across campus categories.</p>
-              </div>
-              <Link
-                to="/leaderboards"
-                className="text-xs font-bold text-primary hover:underline flex items-center gap-1"
-              >
-                <span>Full Leaderboards</span>
-                <ArrowRight className="w-3.5 h-3.5" />
+      {profile && <OnboardingChecklist profile={profile} />}
+
+      {/* Next event + latest results */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        {data ? (
+          data.next ? <NextEventCard event={data.next} /> : (
+            <Card className="flex flex-col justify-center p-5">
+              <div className="text-xs font-bold uppercase tracking-wider text-primary">Titled Tuesday</div>
+              <p className="mt-1 text-lg font-bold text-white">Every Tuesday · 8:30 PM</p>
+              <p className="mt-1 text-sm text-text-muted">The arena link appears here as soon as it's created on Lichess.</p>
+              <Link to="/events" className="btn-secondary mt-4 self-start"><CalendarDays className="h-4 w-4" /> All events</Link>
+            </Card>
+          )
+        ) : <Skeleton className="h-52" />}
+        {data ? (data.latest && <ResultsCard event={data.latest} standings={data.latestStandings} />) : <Skeleton className="h-52" />}
+      </div>
+
+      {/* Club in numbers */}
+      <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatTile icon={Users} label="Members" value={data ? data.counts.members : '—'} />
+        <StatTile icon={Swords} label="Rated games" value={data ? data.counts.games.toLocaleString() : '—'} />
+        <StatTile icon={CalendarDays} label="Events played" value={data ? data.counts.events : '—'} />
+        <StatTile icon={Activity} label="Active this month" value={data ? data.counts.active : '—'} />
+      </section>
+
+      <div className="grid gap-6 lg:grid-cols-5">
+        {/* Top players */}
+        <section className="lg:col-span-3">
+          <SectionHeader title="Top players" subtitle="Blitz rating · active members" to="/leaderboards" />
+          <Card className="divide-y divide-chess-border">
+            {data ? data.top.map((p, i) => (
+              <Link key={p.id} to={`/profile/${p.id}`} className="flex items-center gap-3 px-3 py-3 hover:bg-white/[0.02] sm:px-4">
+                <span className={`w-6 text-center text-sm font-extrabold ${i === 0 ? 'text-yellow-400' : i === 1 ? 'text-slate-300' : i === 2 ? 'text-amber-600' : 'text-text-muted'}`}>{i + 1}</span>
+                <Avatar src={p.avatar_url} name={p.full_name} size="sm" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="truncate font-semibold text-white">{p.full_name}</span>
+                    <TitleBadge title={p.earned_title} />
+                  </div>
+                  <div className="truncate text-xs text-text-muted">{p.department}</div>
+                </div>
+                <span className="text-base font-extrabold tabular-nums text-white">{p.blitz_elo}</span>
               </Link>
+            )) : Array.from({ length: 5 }).map((_, i) => <div key={i} className="p-3"><Skeleton className="h-9" /></div>)}
+          </Card>
+          {data && (
+            <div className="no-scrollbar -mx-4 mt-3 flex gap-3 overflow-x-auto px-4 sm:mx-0 sm:grid sm:grid-cols-3 sm:px-0">
+              {data.leaders.map(({ label, icon: Icon, player }) => player && (
+                <Link key={label} to={`/profile/${player.id}`} className="flex min-w-[220px] items-center gap-3 rounded-2xl border border-chess-border bg-surface p-3 hover:border-primary/40 sm:min-w-0">
+                  <Avatar src={player.avatar_url} name={player.full_name} size="md" />
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1 text-[11px] font-semibold text-text-muted"><Icon className="h-3.5 w-3.5" /> {label}</div>
+                    <div className="truncate text-sm font-bold text-white">{player.full_name}</div>
+                    <div className="text-xs text-text-muted tabular-nums">{player.blitz_elo} blitz</div>
+                  </div>
+                </Link>
+              ))}
             </div>
+          )}
+        </section>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
-              
-              {/* CARD 1: #1 OVERALL PLAYER (DISTINCT GOLDEN DESIGN) */}
-              <div
-                onClick={() => stats.numberOne && navigate(`/profile/${stats.numberOne.player.id}`)}
-                className="bg-gradient-to-b from-[#2A261D] via-[#1E1C18] to-amber-950/40 border-2 border-amber-500/70 p-5 rounded-xl shadow-[0_0_25px_rgba(234,179,8,0.2)] relative overflow-hidden transition-all duration-200 hover:scale-[1.02] cursor-pointer group flex flex-col justify-between"
-              >
-                <div className="absolute -right-6 -top-6 w-24 h-24 bg-amber-500/10 rounded-full blur-xl pointer-events-none" />
+        {/* Season race */}
+        <section className="lg:col-span-2">
+          <SectionHeader title="Season race" subtitle="Points from every arena finish" to="/leaderboards?tab=season" />
+          <Card className="divide-y divide-chess-border">
+            {data ? (data.season.length ? data.season.map((s, i) => (
+              <Link key={s.player_id} to={`/profile/${s.player_id}`} className="flex items-center gap-3 px-3 py-3 hover:bg-white/[0.02] sm:px-4">
+                <span className="w-5 text-center text-sm font-bold text-text-muted">{i + 1}</span>
+                <Avatar src={s.avatar_url} name={s.full_name} size="sm" />
+                <span className="min-w-0 flex-1 truncate font-semibold text-white">{s.full_name}</span>
+                <span className="text-xs text-text-muted">{s.wins > 0 && <Trophy className="mr-1 inline h-3.5 w-3.5 text-yellow-400" />}{s.events} ev</span>
+                <span className="w-12 text-right font-extrabold tabular-nums text-white">{s.points}</span>
+              </Link>
+            )) : <p className="p-5 text-sm text-text-muted">Season standings appear after the next sync.</p>)
+              : Array.from({ length: 5 }).map((_, i) => <div key={i} className="p-3"><Skeleton className="h-9" /></div>)}
+          </Card>
+        </section>
+      </div>
 
-                <div>
-                  <div className="flex items-center justify-between gap-2 mb-3">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-black bg-amber-500 text-black shadow-md uppercase tracking-wider">
-                      <Crown className="w-3.5 h-3.5 fill-black shrink-0" />
-                      <span>Current #1 Player</span>
-                    </span>
-                    <span className="text-[10px] font-bold text-amber-400 font-mono">RANK #1</span>
+      {/* Recent badges */}
+      {data && data.badges.length > 0 && (
+        <section>
+          <SectionHeader title={<span className="flex items-center gap-2"><Sparkles className="h-4 w-4 text-yellow-400" /> Fresh badges</span>} subtitle="Achievements members just unlocked" to="/achievements" />
+          <div className="no-scrollbar -mx-4 flex gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-4 sm:px-0">
+            {data.badges.map((b) => {
+              const def = ACHIEVEMENT_MAP[b.achievement_key];
+              if (!def || !b.player) return null;
+              return (
+                <Link key={`${b.player_id}-${b.achievement_key}`} to={`/profile/${b.player_id}`} className="flex min-w-[240px] items-center gap-3 rounded-2xl border border-chess-border bg-surface p-3 hover:border-primary/40 sm:min-w-0">
+                  <BadgeMedal def={def} earned size="sm" />
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-bold text-white">{def.name}</div>
+                    <div className="truncate text-xs text-text-muted">{b.player.full_name} · {timeAgo(b.earned_at)}</div>
                   </div>
-
-                  {loading ? (
-                    <div className="py-8 text-center">
-                      <div className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin mx-auto" />
-                    </div>
-                  ) : stats.numberOne ? (
-                    <div className="flex items-start gap-3 mb-4">
-                      <div className="relative shrink-0">
-                        <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden bg-[#161512] border-2 border-amber-400 shadow-[0_0_12px_rgba(250,204,21,0.4)] flex items-center justify-center">
-                          {stats.numberOne.player.avatar_url ? (
-                            <img src={stats.numberOne.player.avatar_url} alt={stats.numberOne.player.full_name} className="w-full h-full object-cover" />
-                          ) : (
-                            <User className="w-7 h-7 text-amber-300" />
-                          )}
-                        </div>
-                        <span className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-amber-500 text-black flex items-center justify-center text-[10px] font-black shadow-md">
-                          1
-                        </span>
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <h3 className="font-extrabold text-white text-base sm:text-lg group-hover:text-amber-400 transition-colors truncate">
-                          {stats.numberOne.player.full_name}
-                        </h3>
-                        {stats.numberOne.player.earned_title !== 'NONE' && (
-                          <span className={`inline-block px-1.5 py-0.2 rounded text-[9px] font-black tracking-wider mb-1 ${TITLE_CONFIG[stats.numberOne.player.earned_title].bg}`}>
-                            {TITLE_CONFIG[stats.numberOne.player.earned_title].tag}
-                          </span>
-                        )}
-                        <p className="text-text-muted text-xs truncate">
-                          {stats.numberOne.player.department || 'FUTO Player'}
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-text-muted text-xs py-4">No ranked player available</p>
-                  )}
-                </div>
-
-                {stats.numberOne && (
-                  <div className="pt-3 border-t border-amber-500/30 flex items-center justify-between gap-2">
-                    <div>
-                      <span className="text-[10px] uppercase text-text-muted font-semibold block">Blitz Rating</span>
-                      <span className="text-xl font-black text-amber-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.5)]">
-                        {stats.numberOne.player.blitz_elo} Elo
-                      </span>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-[10px] uppercase text-text-muted font-semibold block">Win Rate</span>
-                      <span className="text-xs font-extrabold text-emerald-400 bg-emerald-950/80 px-2.5 py-0.5 rounded-full border border-emerald-500/40 inline-block mt-0.5">
-                        {stats.numberOne.winRate}% ({stats.numberOne.totalGames} G)
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* CARD 2: TOP STUDENT */}
-              <div
-                onClick={() => stats.topStudent && navigate(`/profile/${stats.topStudent.player.id}`)}
-                className="bg-surface border border-chess-border hover:border-sky-500/60 p-5 rounded-xl shadow-card transition-all duration-200 hover:scale-[1.01] cursor-pointer group flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center justify-between gap-2 mb-3">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-sky-950/80 text-sky-300 border border-sky-500/50 uppercase tracking-wider">
-                      <GraduationCap className="w-3.5 h-3.5 shrink-0" />
-                      <span>Top Student</span>
-                    </span>
-                  </div>
-
-                  {loading ? (
-                    <div className="py-8 text-center">
-                      <div className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin mx-auto" />
-                    </div>
-                  ) : stats.topStudent ? (
-                    <div className="flex items-start gap-3 mb-4">
-                      <div className="w-12 h-12 rounded-full overflow-hidden bg-[#161512] border-2 border-sky-500/60 shrink-0 flex items-center justify-center">
-                        {stats.topStudent.player.avatar_url ? (
-                          <img src={stats.topStudent.player.avatar_url} alt={stats.topStudent.player.full_name} className="w-full h-full object-cover" />
-                        ) : (
-                          <User className="w-6 h-6 text-sky-300" />
-                        )}
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <h3 className="font-bold text-white text-base group-hover:text-sky-300 transition-colors truncate">
-                          {stats.topStudent.player.full_name}
-                        </h3>
-                        {stats.topStudent.player.earned_title !== 'NONE' && (
-                          <span className={`inline-block px-1.5 py-0.2 rounded text-[9px] font-black tracking-wider mb-1 ${TITLE_CONFIG[stats.topStudent.player.earned_title].bg}`}>
-                            {TITLE_CONFIG[stats.topStudent.player.earned_title].tag}
-                          </span>
-                        )}
-                        <p className="text-text-muted text-xs truncate">
-                          {stats.topStudent.player.department || 'FUTO Student'}
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-text-muted text-xs py-4">No student data</p>
-                  )}
-                </div>
-
-                {stats.topStudent && (
-                  <div className="pt-3 border-t border-chess-border flex items-center justify-between gap-2">
-                    <div>
-                      <span className="text-[10px] uppercase text-text-muted font-semibold block">Blitz Rating</span>
-                      <span className="text-lg font-extrabold text-white">
-                        {stats.topStudent.player.blitz_elo} Elo
-                      </span>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-[10px] uppercase text-text-muted font-semibold block">Win Rate</span>
-                      <span className="text-xs font-bold text-sky-300 bg-sky-950/80 px-2 py-0.5 rounded-full border border-sky-500/40 inline-block mt-0.5">
-                        {stats.topStudent.winRate}% ({stats.topStudent.totalGames} G)
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* CARD 3: TOP FEMALE */}
-              <div
-                onClick={() => stats.topFemale && navigate(`/profile/${stats.topFemale.player.id}`)}
-                className="bg-surface border border-chess-border hover:border-rose-500/60 p-5 rounded-xl shadow-card transition-all duration-200 hover:scale-[1.01] cursor-pointer group flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center justify-between gap-2 mb-3">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-rose-950/80 text-rose-300 border border-rose-500/50 uppercase tracking-wider">
-                      <Crown className="w-3.5 h-3.5 shrink-0" />
-                      <span>Top Female</span>
-                    </span>
-                  </div>
-
-                  {loading ? (
-                    <div className="py-8 text-center">
-                      <div className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin mx-auto" />
-                    </div>
-                  ) : stats.topFemale ? (
-                    <div className="flex items-start gap-3 mb-4">
-                      <div className="w-12 h-12 rounded-full overflow-hidden bg-[#161512] border-2 border-rose-500/60 shrink-0 flex items-center justify-center">
-                        {stats.topFemale.player.avatar_url ? (
-                          <img src={stats.topFemale.player.avatar_url} alt={stats.topFemale.player.full_name} className="w-full h-full object-cover" />
-                        ) : (
-                          <User className="w-6 h-6 text-rose-300" />
-                        )}
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <h3 className="font-bold text-white text-base group-hover:text-rose-300 transition-colors truncate">
-                          {stats.topFemale.player.full_name}
-                        </h3>
-                        {stats.topFemale.player.earned_title !== 'NONE' && (
-                          <span className={`inline-block px-1.5 py-0.2 rounded text-[9px] font-black tracking-wider mb-1 ${TITLE_CONFIG[stats.topFemale.player.earned_title].bg}`}>
-                            {TITLE_CONFIG[stats.topFemale.player.earned_title].tag}
-                          </span>
-                        )}
-                        <p className="text-text-muted text-xs truncate">
-                          {stats.topFemale.player.department || 'FUTO Player'}
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-text-muted text-xs py-4">No female player registered yet</p>
-                  )}
-                </div>
-
-                {stats.topFemale && (
-                  <div className="pt-3 border-t border-chess-border flex items-center justify-between gap-2">
-                    <div>
-                      <span className="text-[10px] uppercase text-text-muted font-semibold block">Blitz Rating</span>
-                      <span className="text-lg font-extrabold text-white">
-                        {stats.topFemale.player.blitz_elo} Elo
-                      </span>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-[10px] uppercase text-text-muted font-semibold block">Win Rate</span>
-                      <span className="text-xs font-bold text-rose-300 bg-rose-950/80 px-2 py-0.5 rounded-full border border-rose-500/40 inline-block mt-0.5">
-                        {stats.topFemale.winRate}% ({stats.topFemale.totalGames} G)
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* CARD 4: TOP ALUMNI */}
-              <div
-                onClick={() => stats.topAlumni && navigate(`/profile/${stats.topAlumni.player.id}`)}
-                className="bg-surface border border-chess-border hover:border-emerald-500/60 p-5 rounded-xl shadow-card transition-all duration-200 hover:scale-[1.01] cursor-pointer group flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center justify-between gap-2 mb-3">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-950/80 text-emerald-300 border border-emerald-500/50 uppercase tracking-wider">
-                      <GraduationCap className="w-3.5 h-3.5 shrink-0" />
-                      <span>Top Alumni</span>
-                    </span>
-                  </div>
-
-                  {loading ? (
-                    <div className="py-8 text-center">
-                      <div className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin mx-auto" />
-                    </div>
-                  ) : stats.topAlumni ? (
-                    <div className="flex items-start gap-3 mb-4">
-                      <div className="w-12 h-12 rounded-full overflow-hidden bg-[#161512] border-2 border-emerald-500/60 shrink-0 flex items-center justify-center">
-                        {stats.topAlumni.player.avatar_url ? (
-                          <img src={stats.topAlumni.player.avatar_url} alt={stats.topAlumni.player.full_name} className="w-full h-full object-cover" />
-                        ) : (
-                          <User className="w-6 h-6 text-emerald-300" />
-                        )}
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <h3 className="font-bold text-white text-base group-hover:text-emerald-300 transition-colors truncate">
-                          {stats.topAlumni.player.full_name}
-                        </h3>
-                        {stats.topAlumni.player.earned_title !== 'NONE' && (
-                          <span className={`inline-block px-1.5 py-0.2 rounded text-[9px] font-black tracking-wider mb-1 ${TITLE_CONFIG[stats.topAlumni.player.earned_title].bg}`}>
-                            {TITLE_CONFIG[stats.topAlumni.player.earned_title].tag}
-                          </span>
-                        )}
-                        <p className="text-text-muted text-xs truncate">
-                          {stats.topAlumni.player.department || 'Alumni Player'}
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-text-muted text-xs py-4">No alumni player registered yet</p>
-                  )}
-                </div>
-
-                {stats.topAlumni && (
-                  <div className="pt-3 border-t border-chess-border flex items-center justify-between gap-2">
-                    <div>
-                      <span className="text-[10px] uppercase text-text-muted font-semibold block">Blitz Rating</span>
-                      <span className="text-lg font-extrabold text-white">
-                        {stats.topAlumni.player.blitz_elo} Elo
-                      </span>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-[10px] uppercase text-text-muted font-semibold block">Win Rate</span>
-                      <span className="text-xs font-bold text-emerald-300 bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-500/40 inline-block mt-0.5">
-                        {stats.topAlumni.winRate}% ({stats.topAlumni.totalGames} G)
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-            </div>
+                </Link>
+              );
+            })}
           </div>
+        </section>
+      )}
 
-          {/* Action Cards (Double Grid) */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 mb-8 sm:mb-12">
-            <Link
-              to="/login"
-              className="bg-surface hover:bg-[#2E2B27] border border-chess-border hover:border-primary/50 p-5 sm:p-7 rounded-xl transition-all duration-150 group flex flex-col justify-between shadow-card active:scale-[0.99]"
-            >
-              <div>
-                <div className="w-10 h-10 rounded-md bg-[#161512] flex items-center justify-center mb-3 sm:mb-4 border border-chess-border">
-                  <Zap className="w-5 h-5 text-primary" />
-                </div>
-                <h3 className="text-lg sm:text-xl font-bold text-white mb-2">Become an FCA Player</h3>
-                <p className="text-text-muted text-xs sm:text-sm leading-relaxed mb-4 sm:mb-6">
-                  Register with your student details, link your Lichess or Chess.com profile, and start competing in official rating events.
-                </p>
-              </div>
-              <span className="flex items-center gap-2 text-primary text-xs sm:text-sm font-semibold group-hover:gap-3 transition-all duration-150 min-h-[40px] items-center">
-                Get Started <ArrowRight className="w-4 h-4" />
-              </span>
-            </Link>
-
-            <Link
-              to="/leaderboards"
-              className="bg-surface hover:bg-[#2E2B27] border border-chess-border hover:border-primary/50 p-5 sm:p-7 rounded-xl transition-all duration-150 group flex flex-col justify-between shadow-card active:scale-[0.99]"
-            >
-              <div>
-                <div className="w-10 h-10 rounded-md bg-[#161512] flex items-center justify-center mb-3 sm:mb-4 border border-chess-border">
-                  <Trophy className="w-5 h-5 text-yellow-500" />
-                </div>
-                <h3 className="text-lg sm:text-xl font-bold text-white mb-2">View Leaderboards</h3>
-                <p className="text-text-muted text-xs sm:text-sm leading-relaxed mb-4 sm:mb-6">
-                  Check out current top rankings, filter by department or faculty, and see who dominates FUTO chess.
-                </p>
-              </div>
-              <span className="flex items-center gap-2 text-primary text-xs sm:text-sm font-semibold group-hover:gap-3 transition-all duration-150 min-h-[40px] items-center">
-                Explore Rankings <ArrowRight className="w-4 h-4" />
-              </span>
-            </Link>
+      {/* Grow the club */}
+      <section className="overflow-hidden rounded-3xl border border-primary/30 bg-gradient-to-br from-primary/15 to-transparent p-5 sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-lg font-extrabold text-white">Bring your chess friends</h2>
+            <ul className="mt-2 space-y-1 text-sm text-text-muted">
+              <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-primary" /> Free official FCA rating and titles</li>
+              <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-primary" /> A rated arena with the club every Tuesday</li>
+              <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-primary" /> Recruit 5 friends to unlock the Ambassador badge</li>
+            </ul>
           </div>
-
-          <UpcomingEvents />
-
-          <PastTournaments limit={3} />
-
-          <MemorialBanner />
+          {profile ? (
+            <button onClick={invite} className="btn-primary shrink-0"><Share2 className="h-4 w-4" /> Share my invite link</button>
+          ) : (
+            <Link to="/join" className="btn-primary shrink-0">Create your account <ArrowRight className="h-4 w-4" /></Link>
+          )}
         </div>
       </section>
+
+      <MemorialBanner />
     </div>
   );
 }

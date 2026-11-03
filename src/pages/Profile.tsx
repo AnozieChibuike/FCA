@@ -1,417 +1,300 @@
-import { useEffect, useState, useMemo } from 'react';
-import { useParams } from 'react-router-dom';
-import { User } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Edit3, Share2, Image as ImageIcon, Swords, Clock3, UserPlus, Heart, Trophy, ShieldCheck, ExternalLink, User } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
-import { calculateElo, getKFactor } from '../lib/elo';
-import { type Profile as ProfileType, type Game, type GameMode } from '../types';
-import PlayerStats from '../components/PlayerStats';
-import ChesscomVerifyModal from '../components/ChesscomVerifyModal';
+import {
+  fetchAchievementStats, fetchPlayerAchievements, fetchPlayerGames, fetchPlayerStandings, fetchProfile,
+} from '../lib/api';
+import { inviteUrl, playerCard, shareImage, shareLink, siteUrl } from '../lib/share';
+import { lichessProfileUrl } from '../lib/lichess';
+import { chesscomProfileUrl } from '../lib/chesscom';
+import { formatDate, ordinal, shortEventName } from '../lib/format';
+import type { Game, GameMode, PlayerAchievement, Profile as ProfileType, Standing } from '../types';
+import { TITLE_CONFIG, modeRating, totalGames } from '../types';
+import { ModeCards, PerformanceStats, RatingHistory, RecentForm, outcomeFor } from '../components/profile/RatingPanel';
+import MatchList from '../components/profile/MatchList';
+import EditProfileSheet from '../components/profile/EditProfileSheet';
+import OnboardingChecklist from '../components/profile/OnboardingChecklist';
+import { BadgeGrid, BadgeMedal, ACHIEVEMENT_MAP } from '../components/achievements/Badges';
+import { Avatar, TitleBadge } from '../components/ui/Avatar';
+import { ChesscomIcon, LichessIcon } from '../components/ui/icons';
+import { Card, EmptyState, PageLoader, Segmented, Spinner } from '../components/ui/misc';
+import { useToast } from '../components/ui/Toast';
 
-import ProfileHeader from '../components/profile/ProfileHeader';
-import ModeRatingsGrid from '../components/profile/ModeRatingsGrid';
-import MatchHistoryTable from '../components/profile/MatchHistoryTable';
-import { LichessAccountModal, ChesscomAccountModal } from '../components/profile/AccountModals';
+type Tab = 'overview' | 'games' | 'badges' | 'events';
 
 export default function Profile() {
   const { id } = useParams<{ id: string }>();
-  const { profile: authProfile, refreshProfile } = useAuth();
-  const [player, setPlayer] = useState<ProfileType | null>(null);
-  const [allGames, setAllGames] = useState<Game[]>([]);
-  const [tcFilter, setTcFilter] = useState<'ALL' | GameMode>('ALL');
-  const [gamesPage, setGamesPage] = useState(1);
-  const GAMES_PER_PAGE = 10;
-
-  const [loading, setLoading] = useState(true);
+  const [params, setParams] = useSearchParams();
+  const { profile: me } = useAuth();
+  const toast = useToast();
+  const [player, setPlayer] = useState<ProfileType | null | undefined>(undefined);
+  const [games, setGames] = useState<Game[]>([]);
+  const [badges, setBadges] = useState<PlayerAchievement[]>([]);
+  const [rarity, setRarity] = useState<Record<string, { earned: number; active: number }>>({});
+  const [events, setEvents] = useState<Standing[]>([]);
+  const [recruits, setRecruits] = useState(0);
+  const [rank, setRank] = useState<number | null>(null);
+  const [mode, setMode] = useState<GameMode>('BLITZ');
+  const [tab, setTab] = useState<Tab>('overview');
   const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [editForm, setEditForm] = useState({
-    full_name: '',
-    bio: '',
-    phone: '',
-    gender: '',
-    is_alumni: false,
-    lichess_username: '',
-    chesscom_username: '',
-    department: '',
-    faculty: '',
-  });
-  const [avatarUploading, setAvatarUploading] = useState(false);
-  const [showLichessModal, setShowLichessModal] = useState(false);
-  const [disconnecting, setDisconnecting] = useState(false);
-  const [showChesscomVerifyModal, setShowChesscomVerifyModal] = useState(false);
-  const [showChesscomDetailModal, setShowChesscomDetailModal] = useState(false);
-  const [disconnectingChesscom, setDisconnectingChesscom] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const [version, setVersion] = useState(0);
 
-  const isOwnProfile = authProfile?.id === id;
-
-  const enrichedGames = useMemo(() => {
-    if (!player || allGames.length === 0) return [];
-
-    const sorted = [...allGames].sort(
-      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-    );
-
-    const runningElo: Record<string, number> = {};
-    const runningGamesCount: Record<string, number> = {};
-    const runningPeak: Record<string, number> = {};
-
-    const map = new Map<
-      string,
-      {
-        eloBefore: number;
-        eloAfter: number;
-        eloDiff: number;
-        oppEloBefore: number;
-        oppEloAfter: number;
-        peakElo: number;
-      }
-    >();
-
-    for (const g of sorted) {
-      const isWhite = g.white_player_id === player.id;
-      const userId = player.id;
-      const oppId = isWhite ? g.black_player_id : g.white_player_id;
-      const modeKey = `${userId}_${g.mode}`;
-      const oppModeKey = `${oppId}_${g.mode}`;
-
-      const uElo = runningElo[modeKey] ?? 1200;
-      const oElo = runningElo[oppModeKey] ?? 1200;
-
-      const uGames = runningGamesCount[modeKey] ?? 0;
-      const oGames = runningGamesCount[oppModeKey] ?? 0;
-
-      const uPeak = runningPeak[modeKey] ?? uElo;
-
-      const scoreU = isWhite ? g.result : 1 - g.result;
-
-      const kU = getKFactor(uGames);
-      const kO = getKFactor(oGames);
-
-      const { newA: calcNewU, newB: calcNewO } = calculateElo(uElo, oElo, scoreU, kU, kO);
-
-      const eloBefore = isWhite ? (g.white_elo_before ?? uElo) : (g.black_elo_before ?? uElo);
-      const eloAfter = isWhite ? (g.white_elo_after ?? calcNewU) : (g.black_elo_after ?? calcNewU);
-      const eloDiff = eloAfter - eloBefore;
-
-      const oppEloBefore = isWhite ? (g.black_elo_before ?? oElo) : (g.white_elo_before ?? oElo);
-      const oppEloAfter = isWhite ? (g.black_elo_after ?? calcNewO) : (g.white_elo_after ?? calcNewO);
-
-      const nextPeak = Math.max(uPeak, eloAfter);
-
-      map.set(g.id, {
-        eloBefore,
-        eloAfter,
-        eloDiff,
-        oppEloBefore,
-        oppEloAfter,
-        peakElo: nextPeak,
-      });
-
-      runningElo[modeKey] = eloAfter;
-      runningGamesCount[modeKey] = uGames + 1;
-      runningPeak[modeKey] = nextPeak;
-
-      runningElo[oppModeKey] = oppEloAfter;
-      runningGamesCount[oppModeKey] = oGames + 1;
-      runningPeak[oppModeKey] = Math.max(runningPeak[oppModeKey] ?? oppEloBefore, oppEloAfter);
-    }
-
-    return allGames.map((g) => ({
-      ...g,
-      stats: map.get(g.id) || {
-        eloBefore: 1200,
-        eloAfter: 1200,
-        eloDiff: 0,
-        oppEloBefore: 1200,
-        oppEloAfter: 1200,
-        peakElo: 1200,
-      },
-    }));
-  }, [allGames, player]);
-
-  const filteredGames = useMemo(() => {
-    if (tcFilter === 'ALL') return enrichedGames;
-    return enrichedGames.filter((g) => g.mode === tcFilter);
-  }, [enrichedGames, tcFilter]);
-
-  const totalGamesPages = Math.ceil(filteredGames.length / GAMES_PER_PAGE) || 1;
-  const currentGamesPage = Math.min(gamesPage, totalGamesPages);
-  const startIndex = (currentGamesPage - 1) * GAMES_PER_PAGE;
-  const paginatedGames = filteredGames.slice(startIndex, startIndex + GAMES_PER_PAGE);
-
-  function handleTcFilterChange(newTc: 'ALL' | GameMode) {
-    setTcFilter(newTc);
-    setGamesPage(1);
-  }
+  const isOwn = !!me && me.id === id;
 
   useEffect(() => {
-    async function fetchProfile() {
-      if (!id) return;
-      const { data } = await supabase.from('profiles').select('*').eq('id', id).maybeSingle();
-      setPlayer(data);
-      if (data) {
-        setEditForm({
-          full_name: data.full_name,
-          bio: data.bio || '',
-          phone: data.phone || '',
-          gender: data.gender || '',
-          is_alumni: data.is_alumni || false,
-          lichess_username: data.lichess_username || '',
-          chesscom_username: data.chesscom_username || '',
-          department: data.department,
-          faculty: data.faculty,
-        });
+    if (!id) return;
+    let alive = true;
+    (async () => {
+      const p = await fetchProfile(id);
+      if (!alive) return;
+      setPlayer(p);
+      if (!p) return;
+      // Default the chart to the time control they actually play most.
+      const most = (['BLITZ', 'BULLET', 'RAPID', 'CLASSICAL'] as GameMode[]).sort((a, b) => modeRating(p, b).games - modeRating(p, a).games)[0];
+      if (version === 0) setMode(most);
+      const [g, b, s, st, rec, higher] = await Promise.all([
+        fetchPlayerGames(id).catch(() => []),
+        fetchPlayerAchievements(id).catch(() => []),
+        fetchPlayerStandings(id).catch(() => []),
+        fetchAchievementStats().catch(() => ({})),
+        supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('invited_by', id).eq('status', 'APPROVED'),
+        p.blitz_games > 0
+          ? supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('status', 'APPROVED').eq('is_immortal', false).gt('blitz_games', 0).gt('blitz_elo', p.blitz_elo)
+          : Promise.resolve({ count: null }),
+      ]);
+      if (!alive) return;
+      setGames(g);
+      setBadges(b);
+      setEvents(s);
+      setRarity(st);
+      setRecruits(rec.count ?? 0);
+      setRank(higher.count == null ? null : higher.count + 1);
+    })();
+    return () => { alive = false; };
+  }, [id, version]);
 
-        const { data: gamesData } = await supabase
-          .from('games')
-          .select(`
-            *,
-            white_player:profiles!white_player_id(id, full_name),
-            black_player:profiles!black_player_id(id, full_name)
-          `)
-          .or(`white_player_id.eq.${id},black_player_id.eq.${id}`)
-          .order('created_at', { ascending: false });
-
-        if (gamesData) {
-          setAllGames(gamesData as unknown as Game[]);
-          setGamesPage(1);
-        }
-      }
-      setLoading(false);
+  useEffect(() => {
+    if (isOwn && params.get('edit') === '1') {
+      setEditing(true);
+      params.delete('edit');
+      setParams(params, { replace: true });
     }
-    fetchProfile();
-  }, [id]);
+  }, [isOwn, params, setParams]);
 
-  function startEditing() {
-    if (!player) return;
-    setEditForm({
-      full_name: player.full_name,
-      bio: player.bio || '',
-      phone: player.phone || '',
-      gender: player.gender || '',
-      is_alumni: player.is_alumni || false,
-      lichess_username: player.lichess_username || '',
-      chesscom_username: player.chesscom_username || '',
-      department: player.department,
-      faculty: player.faculty,
-    });
-    setEditing(true);
-  }
+  useEffect(() => setTab('overview'), [id]);
 
-  async function saveProfile() {
-    if (!player) return;
-    setSaving(true);
-    await supabase
-      .from('profiles')
-      .update({
-        full_name: editForm.full_name,
-        bio: editForm.bio,
-        phone: editForm.phone,
-        gender: editForm.gender || null,
-        is_alumni: editForm.is_alumni,
-        lichess_username: editForm.lichess_username || null,
-        chesscom_username: editForm.chesscom_username || null,
-        department: editForm.department,
-        faculty: editForm.faculty,
-      })
-      .eq('id', player.id);
+  const earned = useMemo(() => badges.filter((b) => b.earned_at).sort((a, b) => (b.earned_at ?? '').localeCompare(a.earned_at ?? '')), [badges]);
+  const winRate = useMemo(() => {
+    const off = games.filter((g) => g.is_official !== false);
+    return off.length ? Math.round((off.filter((g) => outcomeFor(g, id!) === 'W').length / off.length) * 100) : 0;
+  }, [games, id]);
 
-    const { data } = await supabase.from('profiles').select('*').eq('id', player.id).maybeSingle();
-    setPlayer(data);
-    setEditing(false);
-    setSaving(false);
-    if (isOwnProfile) await refreshProfile();
-  }
-
-  async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file || !player) return;
-
-    setAvatarUploading(true);
-    try {
-      const { data: existingFiles } = await supabase.storage.from('avatars').list(player.id);
-
-      if (existingFiles && existingFiles.length > 0) {
-        const filesToRemove = existingFiles.map((f) => `${player.id}/${f.name}`);
-        await supabase.storage.from('avatars').remove(filesToRemove);
-      }
-
-      const fileExt = file.name.split('.').pop() || 'png';
-      const fileName = `${player.id}/avatar-${Date.now()}.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(fileName, file, { upsert: true, cacheControl: '3600' });
-
-      if (uploadError) throw uploadError;
-
-      const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(fileName);
-      const publicUrl = `${urlData.publicUrl}?t=${Date.now()}`;
-
-      await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', player.id);
-      const { data } = await supabase.from('profiles').select('*').eq('id', player.id).maybeSingle();
-      setPlayer(data);
-      if (isOwnProfile) await refreshProfile();
-    } catch (err) {
-      console.error('Failed to update avatar:', err);
-    } finally {
-      setAvatarUploading(false);
-    }
-  }
-
-  async function handleDisconnectLichess() {
-    if (!player || !isOwnProfile) return;
-    setDisconnecting(true);
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ lichess_username: null })
-        .eq('id', player.id);
-
-      if (error) throw error;
-
-      setPlayer({ ...player, lichess_username: null });
-      setShowLichessModal(false);
-      await refreshProfile();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to disconnect account.');
-    } finally {
-      setDisconnecting(false);
-    }
-  }
-
-  async function handleDisconnectChesscom() {
-    if (!player || !isOwnProfile) return;
-    setDisconnectingChesscom(true);
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ chesscom_username: null })
-        .eq('id', player.id);
-
-      if (error) throw error;
-
-      setPlayer({ ...player, chesscom_username: null });
-      setShowChesscomDetailModal(false);
-      await refreshProfile();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to disconnect Chess.com account.');
-    } finally {
-      setDisconnectingChesscom(false);
-    }
-  }
-
-  async function handleChesscomSuccess(username: string) {
-    if (!player || !isOwnProfile) return;
-    const { error } = await supabase
-      .from('profiles')
-      .update({ chesscom_username: username })
-      .eq('id', player.id);
-
-    if (!error) {
-      setPlayer({ ...player, chesscom_username: username });
-      await refreshProfile();
-    }
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-      </div>
-    );
-  }
-
+  if (player === undefined) return <PageLoader />;
   if (!player) {
-    return (
-      <div className="min-h-screen flex items-center justify-center px-6">
-        <div className="bg-surface border border-chess-border p-8 text-center max-w-md rounded-lg shadow-card">
-          <User className="w-12 h-12 text-text-muted mx-auto mb-3" />
-          <h1 className="font-bold text-xl mb-2 text-white">Player Not Found</h1>
-          <p className="text-text-muted text-sm">This profile does not exist.</p>
-        </div>
-      </div>
-    );
+    return <div className="page"><EmptyState icon={User} title="Player not found" action={<Link to="/leaderboards" className="btn-secondary">Rankings</Link>} /></div>;
   }
 
-  const displayLichess = player.is_immortal || player.fca_id === 'FCA-ETERNAL'
-    ? (player.lichess_username || 'strengthofLSB')
-    : player.lichess_username;
+  const immortal = player.is_immortal || player.fca_id === 'FCA-ETERNAL';
+  const title = immortal ? 'FET' : player.earned_title;
+
+  async function shareCard() {
+    setSharing(true);
+    try {
+      const r = modeRating(player!, 'BLITZ');
+      const blob = await playerCard({
+        name: player!.full_name,
+        avatar: player!.avatar_url,
+        title: title !== 'NONE' ? TITLE_CONFIG[title].label : null,
+        department: player!.department,
+        rating: r.elo,
+        peak: r.peak,
+        rank,
+        games: totalGames(player!),
+        winRate,
+        badges: earned.length,
+      });
+      const outcome = await shareImage(blob, 'fca-player-card.png', {
+        title: `${player!.full_name} on FCA Rated`,
+        text: isOwn ? 'My FCA rating card ♟️ Join me on FCA Rated:' : `${player!.full_name} on FCA Rated`,
+        url: isOwn ? inviteUrl(player!.fca_id) : siteUrl(`/profile/${player!.id}`),
+      });
+      if (outcome === 'downloaded') toast('Card saved — share it on your status');
+    } catch {
+      toast('Could not create the card', 'error');
+    } finally {
+      setSharing(false);
+    }
+  }
+
+  async function shareProfile() {
+    const outcome = await shareLink({ title: player!.full_name, text: `${player!.full_name} on FCA Rated`, url: siteUrl(`/profile/${player!.id}`) });
+    if (outcome === 'copied') toast('Profile link copied');
+  }
+
+  async function shareInvite() {
+    const outcome = await shareLink({ title: 'Join FCA Rated', text: 'Play rated chess with the FUTO Chess Association. Join with my link:', url: inviteUrl(player!.fca_id) });
+    if (outcome === 'copied') toast('Invite link copied');
+  }
 
   return (
-    <div className="min-h-screen px-3 sm:px-6 pt-20 sm:pt-28 pb-12 sm:pb-16 max-w-5xl mx-auto">
-      {/* Profile Header Component */}
-      <ProfileHeader
-        player={player}
-        isOwnProfile={isOwnProfile}
-        editing={editing}
-        saving={saving}
-        avatarUploading={avatarUploading}
-        editForm={editForm}
-        setEditForm={setEditForm}
-        onStartEditing={startEditing}
-        onSaveProfile={saveProfile}
-        onCancelEditing={() => setEditing(false)}
-        onAvatarUpload={handleAvatarUpload}
-        onShowLichessModal={() => setShowLichessModal(true)}
-        onShowChesscomVerifyModal={() => setShowChesscomVerifyModal(true)}
-        onShowChesscomDetailModal={() => setShowChesscomDetailModal(true)}
-      />
+    <div className="page space-y-5">
+      {/* Header */}
+      <Card className="relative overflow-hidden p-4 sm:p-6">
+        {immortal && <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-purple-500/15 to-transparent" />}
+        <div className="relative flex flex-col items-center gap-4 text-center sm:flex-row sm:items-start sm:text-left">
+          <div className="relative">
+            <Avatar src={immortal ? (player.avatar_url || '/chisom-howell.jpeg') : player.avatar_url} name={player.full_name} size="xl" ring={immortal ? 'border-purple-400/70' : 'border-chess-border'} className="border-2" />
+            {title !== 'NONE' && <TitleBadge title={title} className="absolute -bottom-1 left-1/2 -translate-x-1/2 !text-xs shadow-lg" />}
+          </div>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-2xl font-extrabold text-white sm:text-3xl">{player.full_name}</h1>
+            <p className="mt-0.5 text-sm text-text-muted">
+              {[player.department !== 'N/A' && player.department, player.faculty !== 'N/A' && player.faculty].filter(Boolean).join(' · ') || 'FUTO Chess Association'}
+            </p>
+            <div className="mt-2 flex flex-wrap justify-center gap-1.5 text-xs sm:justify-start">
+              {player.is_admin && <span className="flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 font-semibold text-primary-light"><ShieldCheck className="h-3 w-3" /> Admin</span>}
+              {player.is_arbiter && <span className="flex items-center gap-1 rounded-full bg-sky-500/15 px-2 py-0.5 font-semibold text-sky-300"><ShieldCheck className="h-3 w-3" /> Arbiter</span>}
+              {player.is_alumni && <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 font-semibold text-emerald-300">Alumni</span>}
+              {player.gender === 'FEMALE' && <span className="rounded-full bg-rose-500/15 px-2 py-0.5 font-semibold text-rose-300">♀ Female</span>}
+              {rank && <span className="rounded-full bg-white/5 px-2 py-0.5 font-semibold text-white">#{rank} blitz</span>}
+              <span className="rounded-full bg-white/5 px-2 py-0.5 text-text-muted">{player.fca_id}</span>
+              {!immortal && <span className="flex items-center gap-1 rounded-full bg-white/5 px-2 py-0.5 text-text-muted"><Clock3 className="h-3 w-3" /> since {formatDate(player.created_at, { month: 'short', year: 'numeric' })}</span>}
+            </div>
+            {player.bio && <p className="mt-3 max-w-2xl text-sm text-text-muted">{player.bio}</p>}
+            <div className="mt-3 flex flex-wrap justify-center gap-2 sm:justify-start">
+              {player.lichess_username && (
+                <a href={lichessProfileUrl(player.lichess_username)} target="_blank" rel="noreferrer" className="flex min-h-[36px] items-center gap-1.5 rounded-xl border border-chess-border bg-[#1E1C18] px-3 text-xs font-semibold text-white hover:border-primary/50">
+                  <LichessIcon className="h-4 w-4" /> {player.lichess_username} <ExternalLink className="h-3 w-3 text-text-muted" />
+                </a>
+              )}
+              {player.chesscom_username && (
+                <a href={chesscomProfileUrl(player.chesscom_username)} target="_blank" rel="noreferrer" className="flex min-h-[36px] items-center gap-1.5 rounded-xl border border-chess-border bg-[#1E1C18] px-3 text-xs font-semibold text-white hover:border-primary/50">
+                  <ChesscomIcon className="h-4 w-4" /> {player.chesscom_username} <ExternalLink className="h-3 w-3 text-text-muted" />
+                </a>
+              )}
+            </div>
+          </div>
+          <div className="flex w-full gap-2 sm:w-auto sm:flex-col">
+            {isOwn ? (
+              <>
+                <button onClick={() => setEditing(true)} className="btn-secondary flex-1"><Edit3 className="h-4 w-4" /> Edit</button>
+                <button onClick={shareCard} disabled={sharing} className="btn-primary flex-1">{sharing ? <Spinner className="h-4 w-4" /> : <ImageIcon className="h-4 w-4" />} My card</button>
+              </>
+            ) : (
+              <>
+                {me && !immortal && <Link to={`/compare/${me.id}/${player.id}`} className="btn-primary flex-1"><Swords className="h-4 w-4" /> Compare</Link>}
+                <button onClick={shareProfile} className="btn-secondary flex-1"><Share2 className="h-4 w-4" /> Share</button>
+              </>
+            )}
+          </div>
+        </div>
+      </Card>
 
-      {/* 4 Mode Ratings Grid */}
-      <ModeRatingsGrid player={player} />
-
-      {/* Super Stats Analytics */}
-      {allGames.length > 0 && player && (
-        <PlayerStats games={allGames} playerId={player.id} />
+      {immortal && (
+        <Link to="/memorial" className="flex items-center gap-3 rounded-2xl border border-purple-500/30 bg-purple-500/[0.07] p-4">
+          <Heart className="h-5 w-5 fill-purple-400 text-purple-400" />
+          <span className="flex-1 text-sm text-purple-100">FCA Eternal — this profile is preserved in memory. Read the tribute.</span>
+        </Link>
       )}
 
-      {/* Match History Table & Cards */}
-      <MatchHistoryTable
-        player={player}
-        allGames={allGames}
-        tcFilter={tcFilter}
-        onTcFilterChange={handleTcFilterChange}
-        filteredGamesCount={filteredGames.length}
-        paginatedGames={paginatedGames}
-        currentGamesPage={currentGamesPage}
-        totalGamesPages={totalGamesPages}
-        startIndex={startIndex}
-        gamesPerPage={GAMES_PER_PAGE}
-        onPageChange={(page) => setGamesPage(page)}
-      />
+      {isOwn && player.status === 'PENDING' && (
+        <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
+          Your membership is awaiting approval by an FCA admin. You can still connect Lichess and play — your games are rated once you're approved.
+        </div>
+      )}
+      {isOwn && <OnboardingChecklist profile={player} />}
 
-      {/* Lichess Account Interactive Popup Modal */}
-      {showLichessModal && displayLichess && (
-        <LichessAccountModal
-          username={displayLichess}
-          isOwnProfile={isOwnProfile}
-          disconnecting={disconnecting}
-          onClose={() => setShowLichessModal(false)}
-          onDisconnect={handleDisconnectLichess}
-        />
+      {!immortal && (
+        <>
+          <ModeCards player={player} mode={mode} onMode={setMode} />
+
+          <Segmented
+            value={tab}
+            onChange={setTab}
+            options={[
+              { value: 'overview', label: 'Overview' },
+              { value: 'games', label: `Games${games.length ? ` (${games.length})` : ''}` },
+              { value: 'badges', label: `Badges${earned.length ? ` (${earned.length})` : ''}` },
+              { value: 'events', label: 'Events' },
+            ]}
+          />
+
+          {tab === 'overview' && (
+            <div className="grid gap-4 lg:grid-cols-3">
+              <div className="space-y-4 lg:col-span-2">
+                <RatingHistory games={games} playerId={player.id} mode={mode} />
+                <RecentForm games={games} playerId={player.id} />
+                {earned.length > 0 && (
+                  <Card className="p-4 sm:p-5">
+                    <div className="mb-3 flex items-center justify-between">
+                      <h3 className="text-sm font-bold text-white">Latest badges</h3>
+                      <button onClick={() => setTab('badges')} className="text-xs font-semibold text-primary">All {earned.length}</button>
+                    </div>
+                    <div className="no-scrollbar flex gap-3 overflow-x-auto">
+                      {earned.slice(0, 8).map((b) => {
+                        const def = ACHIEVEMENT_MAP[b.achievement_key];
+                        return def && (
+                          <div key={b.achievement_key} className="flex w-20 shrink-0 flex-col items-center gap-1.5 text-center">
+                            <BadgeMedal def={def} earned />
+                            <span className="line-clamp-2 text-[11px] font-semibold leading-tight text-white">{def.name}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </Card>
+                )}
+              </div>
+              <div className="space-y-4">
+                <PerformanceStats games={games} playerId={player.id} viewerId={me?.id} />
+                {isOwn && (
+                  <Card className="p-4 sm:p-5">
+                    <h3 className="flex items-center gap-2 text-sm font-bold text-white"><UserPlus className="h-4 w-4 text-primary" /> Invite friends</h3>
+                    <p className="mt-1 text-xs text-text-muted">
+                      {recruits ? `You've brought ${recruits} member${recruits === 1 ? '' : 's'} to FCA.` : 'Members who sign up with your link count towards your recruiter badges.'}
+                    </p>
+                    <button onClick={shareInvite} className="btn-primary mt-3 w-full"><Share2 className="h-4 w-4" /> Share my invite link</button>
+                  </Card>
+                )}
+              </div>
+            </div>
+          )}
+
+          {tab === 'games' && <MatchList games={games} playerId={player.id} />}
+
+          {tab === 'badges' && <BadgeGrid rows={badges} rarity={rarity} />}
+
+          {tab === 'events' && (
+            events.length === 0 ? (
+              <Card><EmptyState icon={Trophy} title="No events yet" text="Arenas this player joined show up here with their finishing position." /></Card>
+            ) : (
+              <Card className="divide-y divide-chess-border overflow-hidden">
+                {events.map((s) => (
+                  <Link key={s.tournament_id} to={`/events/${s.tournament_id}`} className="flex items-center gap-3 px-3 py-3 hover:bg-white/[0.02] sm:px-4">
+                    <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-extrabold ${
+                      s.fca_rank === 1 ? 'bg-yellow-400/15 text-yellow-400' : s.fca_rank && s.fca_rank <= 3 ? 'bg-white/10 text-white' : 'bg-white/[0.04] text-text-muted'}`}
+                    >
+                      {s.fca_rank ? ordinal(s.fca_rank) : '—'}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate font-semibold text-white">{shortEventName(s.tournament_title)}</div>
+                      <div className="text-xs text-text-muted">{formatDate(s.tournament_date)} · overall #{s.rank} · {s.games} games</div>
+                    </div>
+                    <span className="text-right">
+                      <span className="block font-bold tabular-nums text-white">{s.score}</span>
+                      <span className="text-[10px] text-text-muted">arena pts</span>
+                    </span>
+                  </Link>
+                ))}
+              </Card>
+            )
+          )}
+        </>
       )}
 
-      {/* Chess.com Account Interactive Popup Modal */}
-      {showChesscomDetailModal && player.chesscom_username && (
-        <ChesscomAccountModal
-          username={player.chesscom_username}
-          isOwnProfile={isOwnProfile}
-          disconnecting={disconnectingChesscom}
-          onClose={() => setShowChesscomDetailModal(false)}
-          onDisconnect={handleDisconnectChesscom}
-        />
-      )}
-
-      {/* Chess.com Verification Modal */}
-      {showChesscomVerifyModal && isOwnProfile && (
-        <ChesscomVerifyModal
-          isOpen={showChesscomVerifyModal}
-          onClose={() => setShowChesscomVerifyModal(false)}
-          onSuccess={handleChesscomSuccess}
-        />
-      )}
+      {isOwn && <EditProfileSheet player={player} open={editing} onClose={() => setEditing(false)} onSaved={() => setVersion((v) => v + 1)} />}
     </div>
   );
 }

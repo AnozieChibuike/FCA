@@ -1,6 +1,8 @@
-import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useRef, ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { User, Session, AuthError } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
+import { supabase } from './supabase';
+import { PROFILE_COLUMNS } from './api';
 import type { Profile } from '../types';
 
 interface AuthContextType {
@@ -14,139 +16,110 @@ interface AuthContextType {
   refreshProfile: () => Promise<void>;
   isAdmin: boolean;
   isArbiter: boolean;
+  isStaff: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const loadedFor = useRef<string | null>(null);
 
   const fetchProfile = useCallback(async (userId: string) => {
-    setLoading(true);
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .maybeSingle();
-
-    if (data) {
-      setProfile(data);
-    } else {
-      const { data: userData } = await supabase.auth.getUser();
-      const currentUser = userData?.user;
-      if (currentUser) {
-        const meta = currentUser.user_metadata || {};
-        const fallbackFcaId = meta.fca_id || `FCA-${userId.substring(0, 8).toUpperCase()}`;
-        const newProfile = {
+    let { data } = await supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', userId).maybeSingle();
+    if (!data) {
+      // The signup trigger creates the profile; give it a moment, then create a minimal one as a safety net.
+      await new Promise((r) => setTimeout(r, 800));
+      ({ data } = await supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', userId).maybeSingle());
+      if (!data) {
+        const { data: auth } = await supabase.auth.getUser();
+        const meta = auth.user?.user_metadata ?? {};
+        await supabase.from('profiles').insert({
           id: userId,
-          fca_id: fallbackFcaId,
-          full_name: meta.full_name || currentUser.email?.split('@')[0] || 'Member',
+          full_name: meta.full_name || auth.user?.email?.split('@')[0] || 'Member',
           reg_number: meta.reg_number || 'N/A',
           department: meta.department || 'N/A',
           faculty: meta.faculty || 'N/A',
-          phone: meta.phone || null,
-          status: meta.status || 'PENDING',
-          is_admin: meta.is_admin === true || meta.is_admin === 'true',
-          is_arbiter: meta.is_arbiter === true || meta.is_arbiter === 'true',
-        };
-        const { data: created } = await supabase
-          .from('profiles')
-          .insert(newProfile)
-          .select('*')
-          .maybeSingle();
-        setProfile(created || (newProfile as unknown as Profile));
-      } else {
-        setProfile(null);
+        });
+        ({ data } = await supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', userId).maybeSingle());
       }
     }
-    setLoading(false);
+    setProfile((data as Profile | null) ?? null);
+    loadedFor.current = userId;
   }, []);
 
   const refreshProfile = useCallback(async () => {
-    if (user) {
-      await fetchProfile(user.id);
-    }
+    if (user) await fetchProfile(user.id);
   }, [user, fetchProfile]);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    let active = true;
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!active) return;
       setSession(session);
       setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id);
-      } else {
-        setLoading(false);
-      }
+      if (session?.user) await fetchProfile(session.user.id);
+      setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id);
-      } else {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, next) => {
+      setSession(next);
+      setUser(next?.user ?? null);
+      if (event === 'PASSWORD_RECOVERY') navigate('/reset-password');
+      if (!next?.user) {
         setProfile(null);
+        loadedFor.current = null;
         setLoading(false);
+        return;
+      }
+      if (loadedFor.current !== next.user.id) {
+        // Defer out of the auth callback (supabase-js recommends not awaiting inside it).
+        setTimeout(() => fetchProfile(next.user.id).finally(() => setLoading(false)), 0);
       }
     });
 
-    return () => subscription.unsubscribe();
-  }, [fetchProfile]);
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
+  }, [fetchProfile, navigate]);
 
   async function signIn(email: string, password: string) {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+    if (!error && data.user) await fetchProfile(data.user.id);
     return { error };
   }
 
   async function signUp(email: string, password: string, metadata: Record<string, unknown>) {
-    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: metadata },
-    });
-    if (signUpError) return { error: signUpError };
-
-    // 1. If signUp returned an active session directly, set context and fetch profile immediately
-    if (signUpData?.session) {
-      setSession(signUpData.session);
-      setUser(signUpData.session.user);
-      await fetchProfile(signUpData.session.user.id);
+    const { data, error } = await supabase.auth.signUp({ email: email.trim(), password, options: { data: metadata } });
+    if (error) return { error };
+    if (data.session) {
+      setSession(data.session);
+      setUser(data.session.user);
+      await fetchProfile(data.session.user.id);
       return { error: null };
     }
-
-    // 2. Otherwise auto-login via signInWithPassword
-    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-    if (signInError) return { error: signInError };
-
-    if (signInData?.session) {
-      setSession(signInData.session);
-      setUser(signInData.session.user);
-      await fetchProfile(signInData.session.user.id);
-    }
-
-    return { error: null };
+    // Email confirmation is auto-approved server-side; sign straight in.
+    return signIn(email, password);
   }
 
   async function signOut() {
     await supabase.auth.signOut();
     setProfile(null);
+    loadedFor.current = null;
   }
+
+  const isAdmin = profile?.is_admin ?? false;
+  const isArbiter = profile?.is_arbiter ?? false;
 
   return (
     <AuthContext.Provider value={{
-      user,
-      profile,
-      session,
-      loading,
-      signIn,
-      signUp,
-      signOut,
-      refreshProfile,
-      isAdmin: profile?.is_admin ?? false,
-      isArbiter: profile?.is_arbiter ?? false,
+      user, profile, session, loading, signIn, signUp, signOut, refreshProfile,
+      isAdmin, isArbiter, isStaff: isAdmin || isArbiter,
     }}>
       {children}
     </AuthContext.Provider>
@@ -155,8 +128,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
+  if (context === undefined) throw new Error('useAuth must be used within an AuthProvider');
   return context;
 }
