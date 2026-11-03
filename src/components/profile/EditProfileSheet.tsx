@@ -163,7 +163,7 @@ export default function EditProfileSheet({ player, open, onClose, onSaved }: {
           <span className="field-label">Bio</span>
           <textarea className="input-field min-h-[84px]" value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} maxLength={240} placeholder="Favourite opening, chess hero, anything…" />
         </label>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <label className="block">
             <span className="field-label">Faculty / school</span>
             <select className="input-field" value={form.faculty} onChange={(e) => setForm({ ...form, faculty: e.target.value, department: '' })}>

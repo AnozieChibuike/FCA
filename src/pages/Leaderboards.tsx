@@ -4,6 +4,7 @@ import { Search, Target, SlidersHorizontal, Star, Share2, Building2, Megaphone, 
 import { useAuth } from '../lib/auth';
 import { fetchProfiles, fetchRecruiters } from '../lib/api';
 import { inviteUrl, shareLink } from '../lib/share';
+import { plural } from '../lib/format';
 import type { GameMode, Profile, Recruiter } from '../types';
 import { MODES, MODE_LABELS, modeRating } from '../types';
 import SeasonTable from '../components/events/SeasonTable';
@@ -194,7 +195,7 @@ function PlayersTab({ profiles }: { profiles: Profile[] | null }) {
                           {isMe && <span className="rounded bg-primary px-1.5 text-[10px] font-bold text-black">YOU</span>}
                         </span>
                         <span className="block truncate text-xs text-text-muted md:hidden">
-                          {p.department}{p.is_alumni ? ' · Alumni' : ''} · {r.games} games
+                          {p.department}{p.is_alumni ? ' · Alumni' : ''} · {plural(r.games, 'game')}
                         </span>
                         {p.is_alumni && <span className="hidden text-xs text-emerald-300/80 md:block">Alumni</span>}
                       </span>
@@ -285,7 +286,7 @@ function DepartmentsTab({ profiles }: { profiles: Profile[] | null }) {
               <div className="min-w-0 flex-1">
                 <div className="truncate font-semibold text-white">{r.name}</div>
                 <div className="truncate text-xs text-text-muted">
-                  {r.members} members · {r.active} active · {r.games} games
+                  {plural(r.members, 'member')} · {r.active} active · {plural(r.games, 'game')}
                   {r.best ? <> · best <Link to={`/profile/${r.best.id}`} className="text-white hover:text-primary-light">{r.best.full_name.split(' ')[0]}</Link></> : null}
                 </div>
               </div>

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CalendarPlus, ExternalLink, Share2, Radio, Users, Trophy, ChevronRight, Swords, Image as ImageIcon } from 'lucide-react';
+import { CalendarPlus, ExternalLink, Share2, Radio, Users, Trophy, ChevronRight, Swords, Flame, Image as ImageIcon } from 'lucide-react';
 import type { Standing, TournamentSummary } from '../../types';
 import { MODE_LABELS } from '../../types';
 import { arenaUrl, fetchLiveArena, type LiveArena as LiveArenaData } from '../../lib/lichess';
@@ -10,6 +10,7 @@ import { formatDate, formatDateTime, formatTime, shortEventName } from '../../li
 import { supabase } from '../../lib/supabase';
 import { Avatar, TitleBadge } from '../ui/Avatar';
 import { Card, Countdown, ModeIcon, Spinner } from '../ui/misc';
+import { RankMedal } from '../achievements/Badges';
 import { useToast } from '../ui/Toast';
 
 export const isTitledTuesday = (title: string) => /titled\s*tuesday/i.test(title);
@@ -145,7 +146,7 @@ export function LiveArena({ arenaId, limit = 8 }: { arenaId: string; limit?: num
                   <span className="rounded bg-white/5 px-1.5 text-[10px] text-text-muted">guest</span>
                 </span>
               )}
-              <span className="text-sm font-bold tabular-nums text-white">{p.score}{p.sheet?.fire ? ' 🔥' : ''}</span>
+              <span className="flex items-center gap-1 text-sm font-bold tabular-nums text-white">{p.sheet?.fire && <Flame className="h-3.5 w-3.5 text-orange-400" aria-label="on a streak" />}{p.score}</span>
             </li>
           );
         })}
@@ -162,9 +163,9 @@ export function Podium({ standings }: { standings: Standing[] }) {
   if (!top.length) return null;
   const order = [top[1], top[0], top[2]];
   const style = [
-    { ring: 'border-slate-300', h: 'h-14', medal: '🥈' },
-    { ring: 'border-yellow-400', h: 'h-20', medal: '🥇' },
-    { ring: 'border-amber-600', h: 'h-10', medal: '🥉' },
+    { ring: 'border-slate-300', h: 'h-14', rank: 2 as const },
+    { ring: 'border-yellow-400', h: 'h-20', rank: 1 as const },
+    { ring: 'border-amber-600', h: 'h-10', rank: 3 as const },
   ];
   return (
     <div className="grid grid-cols-3 items-end gap-2">
@@ -173,14 +174,16 @@ export function Podium({ standings }: { standings: Standing[] }) {
           <Avatar src={s.avatar_url} name={s.full_name ?? s.lichess_username} size={i === 1 ? 'lg' : 'md'} ring={style[i].ring} className="border-2" />
           <span className="mt-1.5 w-full truncate text-xs font-bold text-white sm:text-sm">{s.full_name ?? s.lichess_username}</span>
           <span className="text-[11px] text-text-muted">{s.score} pts</span>
-          <span className={`mt-1.5 flex w-full items-start justify-center rounded-t-lg bg-white/[0.06] pt-1 text-lg ${style[i].h}`}>{style[i].medal}</span>
+          <span className={`mt-1.5 flex w-full items-start justify-center rounded-t-lg bg-white/[0.06] pt-1.5 ${style[i].h}`}><RankMedal rank={style[i].rank} size={i === 1 ? 30 : 26} /></span>
         </Link>
       ) : <span key={i} />)}
     </div>
   );
 }
 
-export function ResultsCard({ event, standings }: { event: TournamentSummary; standings: Standing[] }) {
+export function ResultsCard({ event, standings, label = 'Latest results', showTitle = true }: {
+  event: TournamentSummary; standings: Standing[]; label?: string; showTitle?: boolean;
+}) {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
   const top = useMemo(() => standings.filter((s) => s.fca_rank != null).slice(0, 3), [standings]);
@@ -197,7 +200,7 @@ export function ResultsCard({ event, standings }: { event: TournamentSummary; st
       });
       const outcome = await shareImage(blob, 'fca-results.png', {
         title: event.title,
-        text: `${event.title} results 🏆`,
+        text: `${event.title} results`,
         url: siteUrl(`/events/${event.id}`),
       });
       if (outcome === 'downloaded') toast('Results image saved — post it on your status');
@@ -212,9 +215,14 @@ export function ResultsCard({ event, standings }: { event: TournamentSummary; st
     <Card className="p-4 sm:p-5">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-xs font-bold uppercase tracking-wider text-primary">Latest results</div>
-          <Link to={`/events/${event.id}`} className="mt-0.5 block truncate text-base font-bold text-white hover:text-primary-light">{event.title}</Link>
-          <div className="text-xs text-text-muted">{formatDate(event.start_date)} · {event.participants || event.nb_players} players · {event.rated_games} rated games</div>
+          <div className="text-xs font-bold uppercase tracking-wider text-primary">{label}</div>
+          {showTitle && (
+            <>
+              <Link to={`/events/${event.id}`} className="mt-0.5 block truncate text-base font-bold text-white hover:text-primary-light">{event.title}</Link>
+              <div className="text-xs text-text-muted">{formatDate(event.start_date)} · {event.participants || event.nb_players} players · {event.rated_games} rated games</div>
+            </>
+          )}
+          {!showTitle && <div className="mt-0.5 text-xs text-text-muted">Top FCA members · share the results image</div>}
         </div>
         <button onClick={shareCard} disabled={busy} className="btn-secondary !min-h-[40px] shrink-0 !px-3" aria-label="Share results image">
           {busy ? <Spinner className="h-4 w-4" /> : <ImageIcon className="h-4 w-4" />}

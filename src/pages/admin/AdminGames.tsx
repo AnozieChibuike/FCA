@@ -74,7 +74,7 @@ export default function AdminGames() {
         <SectionHeader title="Log an over-the-board game" subtitle="Ratings are rebuilt in date order, so you can log games after the fact" />
         <Card className="p-4">
           <form onSubmit={submit} className="space-y-4">
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <span className="field-label">White</span>
                 <PlayerPicker label="Pick white" value={white} onChange={setWhite} exclude={black} />
@@ -103,7 +103,7 @@ export default function AdminGames() {
                 ))}
               </div>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <label className="block">
                 <span className="field-label">Event</span>
                 <input className="input-field" list="otb-events" value={eventName} onChange={(e) => setEventName(e.target.value)} />

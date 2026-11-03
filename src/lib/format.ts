@@ -50,6 +50,10 @@ export function ordinal(n: number) {
   return `${n}${s[(v - 20) % 10] || s[v] || s[0]}`;
 }
 
+export function plural(n: number, word: string) {
+  return `${n} ${word}${n === 1 ? '' : 's'}`;
+}
+
 export function signed(n: number) {
   return n > 0 ? `+${n}` : `${n}`;
 }

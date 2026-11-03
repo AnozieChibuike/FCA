@@ -155,7 +155,7 @@ export default function AdminImports() {
         )}
       </section>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card className="p-4">
           <h3 className="flex items-center gap-2 font-bold text-white"><Download className="h-4 w-4 text-primary" /> Import any arena</h3>
           <p className="mt-1 text-xs text-text-muted">Paste a Lichess arena link (e.g. one created by another account). It's queued above for approval.</p>

@@ -4,7 +4,7 @@ import { Users, UserCheck, Activity, Link2, Swords, Inbox, RefreshCw, Copy, Exte
 import { supabase } from '../../lib/supabase';
 import { errorMessage, invokeFca } from '../../lib/api';
 import { copyText, siteUrl } from '../../lib/share';
-import { formatDate, shortEventName, timeAgo } from '../../lib/format';
+import { formatDate, plural, shortEventName, timeAgo } from '../../lib/format';
 import { lichessProfileUrl } from '../../lib/lichess';
 import type { AdminStats } from '../../types';
 import { CHART, ColumnChart, HBarChart } from '../../components/charts/charts';
@@ -53,7 +53,7 @@ export default function AdminOverview() {
   }
 
   function inviteMessage(username: string, events: number) {
-    return `Hi ${username}! You've played ${events} FCA arena${events === 1 ? '' : 's'} on Lichess 🙌 Join FCA Rated so your games count towards an official FCA rating, titles and badges: ${siteUrl('/join')}`;
+    return `Hi ${username}! You've played ${events} FCA arena${events === 1 ? '' : 's'} on Lichess. Join FCA Rated so your games count towards an official FCA rating, titles and badges: ${siteUrl('/join')}`;
   }
 
   if (error) return <Card><EmptyState icon={AlertTriangle} title="Stats unavailable" text={error} /></Card>;
@@ -71,7 +71,7 @@ export default function AdminOverview() {
   return (
     <div className="space-y-6">
       {(stats.pending_imports > 0 || m.pending > 0) && (
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {stats.pending_imports > 0 && (
             <Link to="/admin/imports" className="flex items-center gap-3 rounded-2xl border border-primary/40 bg-primary/10 p-4">
               <Inbox className="h-5 w-5 text-primary" />
@@ -124,7 +124,7 @@ export default function AdminOverview() {
         </Card>
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <section>
           <SectionHeader title="Sign-ups per week" subtitle="Last 16 weeks" />
           <Card className="p-4">
@@ -142,11 +142,11 @@ export default function AdminOverview() {
       <section>
         <SectionHeader title="Recruit these players" subtitle="They keep playing FCA arenas but haven't joined FCA Rated" />
         <Card className="divide-y divide-chess-border overflow-hidden">
-          {stats.unlinked_regulars.length === 0 ? <EmptyState title="Everyone who plays is a member 🎉" /> : stats.unlinked_regulars.map((u) => (
+          {stats.unlinked_regulars.length === 0 ? <EmptyState title="Everyone who plays is a member" /> : stats.unlinked_regulars.map((u) => (
             <div key={u.lichess_username} className="flex items-center gap-3 px-3 py-2.5 sm:px-4">
               <div className="min-w-0 flex-1">
                 <div className="truncate font-semibold text-white">{u.lichess_username}</div>
-                <div className="text-xs text-text-muted">{u.events} events · {u.games} games · best #{u.best_rank} · last {timeAgo(u.last_seen)}</div>
+                <div className="text-xs text-text-muted">{plural(u.events, 'event')} · {plural(u.games, 'game')} · best #{u.best_rank} · last {timeAgo(u.last_seen)}</div>
               </div>
               <button
                 onClick={() => copyText(inviteMessage(u.lichess_username, u.events)).then(() => toast('Invite message copied'))}

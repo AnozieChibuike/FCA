@@ -1,5 +1,12 @@
-import { useMemo, useState } from 'react';
-import { Lock } from 'lucide-react';
+import { useId, useMemo, useState } from 'react';
+import {
+  Award, Axe, BadgeCheck, BookOpen, Brain, BrickWall, CalendarCheck, CalendarDays, CalendarHeart, Camera, Castle,
+  Clock, Coffee, CopyCheck, Crosshair, Crown, Dog, Dumbbell, Eye, Flag, Flame, FlameKindling, Footprints, Gavel, Gem,
+  Globe, GraduationCap, Grid3x3, Hammer, HelpCircle, Hourglass, Infinity as InfinityIcon, Landmark, Link, Lock, Medal,
+  Megaphone, Moon, MoonStar, Mountain, MountainSnow, Network, PartyPopper, Play, Repeat, Rocket, RotateCcw, Scale,
+  Shapes, ShieldCheck, Skull, Sparkle, Sparkles, Sprout, Star, Sun, Sword, Swords, Target, Ticket, Timer, Tornado,
+  TrendingUp, Trophy, Users, UsersRound, Zap, type LucideIcon,
+} from 'lucide-react';
 import {
   ACHIEVEMENTS, ACHIEVEMENT_CATEGORIES, ACHIEVEMENT_MAP, TIER_ORDER,
   type AchievementDef, type AchievementTier,
@@ -12,34 +19,118 @@ import Sheet from '../ui/Sheet';
 export { ACHIEVEMENTS, ACHIEVEMENT_MAP, ACHIEVEMENT_CATEGORIES };
 export type { AchievementDef };
 
-const TIER_STYLE: Record<AchievementTier, { ring: string; bg: string; label: string; text: string }> = {
-  bronze: { ring: 'ring-amber-700/70', bg: 'from-amber-800/50 to-amber-950/60', label: 'Bronze', text: 'text-amber-500' },
-  silver: { ring: 'ring-slate-300/60', bg: 'from-slate-400/30 to-slate-700/40', label: 'Silver', text: 'text-slate-300' },
-  gold: { ring: 'ring-yellow-400/70', bg: 'from-yellow-500/35 to-amber-700/40', label: 'Gold', text: 'text-yellow-400' },
-  platinum: { ring: 'ring-cyan-300/70', bg: 'from-cyan-300/30 to-sky-700/40', label: 'Platinum', text: 'text-cyan-300' },
-  legendary: { ring: 'ring-fuchsia-400/80', bg: 'from-fuchsia-500/40 to-purple-800/50', label: 'Legendary', text: 'text-fuchsia-300' },
+// Explicit map (not `import *`) so only these icons end up in the bundle.
+const BADGE_ICONS: Record<string, LucideIcon> = {
+  Award, Axe, BadgeCheck, BookOpen, Brain, BrickWall, CalendarCheck, CalendarDays, CalendarHeart, Camera, Castle,
+  Clock, Coffee, CopyCheck, Crosshair, Crown, Dog, Dumbbell, Eye, Flag, Flame, FlameKindling, Footprints, Gavel, Gem,
+  Globe, GraduationCap, Grid3x3, Hammer, Hourglass, Infinity: InfinityIcon, Landmark, Link, Medal, Megaphone, Moon,
+  MoonStar, Mountain, MountainSnow, Network, PartyPopper, Play, Repeat, Rocket, RotateCcw, Scale, Shapes, ShieldCheck,
+  Skull, Sparkle, Sparkles, Sprout, Star, Sun, Sword, Swords, Target, Ticket, Timer, Tornado, TrendingUp, Trophy, Users,
+  UsersRound, Zap,
 };
+
+const TIER_STYLE: Record<AchievementTier, { label: string; text: string }> = {
+  bronze: { label: 'Bronze', text: 'text-amber-500' },
+  silver: { label: 'Silver', text: 'text-slate-300' },
+  gold: { label: 'Gold', text: 'text-yellow-400' },
+  platinum: { label: 'Platinum', text: 'text-cyan-300' },
+  legendary: { label: 'Legendary', text: 'text-fuchsia-300' },
+};
+
+// Metal finishes: light edge -> body -> shadow, a bright rim, and an icon ink that reads on the body colour.
+const METAL: Record<AchievementTier, { stops: [string, string, string]; rim: string; ink: string; glow?: string }> = {
+  bronze: { stops: ['#F6C08A', '#C47A3C', '#6E3A12'], rim: '#FFD7AE', ink: '#FFF4E6' },
+  silver: { stops: ['#FFFFFF', '#C9D1DC', '#5F6B7A'], rim: '#FFFFFF', ink: '#1E293B' },
+  gold: { stops: ['#FFF3A3', '#F5C518', '#94600A'], rim: '#FFF9D6', ink: '#3F2304' },
+  platinum: { stops: ['#E2FDFF', '#7BE3F3', '#0B6E86'], rim: '#F0FEFF', ink: '#062F3A' },
+  legendary: { stops: ['#FBD7FF', '#D24BE8', '#5B1890'], rim: '#FCE8FF', ink: '#FFFFFF', glow: 'rgba(210,75,232,0.55)' },
+};
+
+const HEX = 'M32 2.5 57.5 17v30L32 61.5 6.5 47V17Z';
+const HEX_INNER = 'M32 8.5 52 20v24L32 55.5 12 44V20Z';
+const SIZE = { sm: 40, md: 56, lg: 84 } as const;
 
 export function tierLabel(tier: AchievementTier) {
   return TIER_STYLE[tier];
 }
 
-export function BadgeMedal({ def, earned, size = 'md' }: { def: AchievementDef; earned: boolean; size?: 'sm' | 'md' | 'lg' }) {
-  const t = TIER_STYLE[def.tier];
-  const dims = size === 'lg' ? 'h-20 w-20 text-4xl' : size === 'sm' ? 'h-10 w-10 text-xl' : 'h-14 w-14 text-2xl';
+/** Hexagonal medallion: metallic finish when earned, carved stone with a lock while locked. */
+export function BadgeMedal({ def, earned, size = 'md' }: { def: AchievementDef; earned: boolean; size?: keyof typeof SIZE }) {
+  const uid = useId().replace(/[^a-zA-Z0-9]/g, '');
+  const px = SIZE[size];
+  const metal = METAL[def.tier];
+  const hidden = def.secret && !earned;
+  const Icon = hidden ? HelpCircle : BADGE_ICONS[def.icon] ?? Award;
+
   return (
     <span
-      className={`relative inline-flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br ring-2 ${dims} ${
-        earned ? `${t.bg} ${t.ring} ${def.tier === 'legendary' ? 'shadow-[0_0_18px_rgba(217,70,239,0.35)]' : ''}` : 'from-white/[0.04] to-white/[0.02] ring-white/10'
-      }`}
+      className={`relative inline-flex shrink-0 items-center justify-center ${earned && def.tier === 'legendary' ? 'badge-legendary' : ''}`}
+      style={{ width: px, height: px }}
       aria-hidden="true"
     >
-      <span className={earned ? '' : 'opacity-25 grayscale'}>{def.secret && !earned ? '❔' : def.icon}</span>
+      <svg viewBox="0 0 64 64" width={px} height={px} className="absolute inset-0 overflow-visible">
+        <defs>
+          <linearGradient id={`body-${uid}`} x1="0.15" y1="0" x2="0.85" y2="1">
+            <stop offset="0" stopColor={metal.stops[0]} />
+            <stop offset="0.5" stopColor={metal.stops[1]} />
+            <stop offset="1" stopColor={metal.stops[2]} />
+          </linearGradient>
+          <linearGradient id={`gloss-${uid}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#FFFFFF" stopOpacity="0.5" />
+            <stop offset="0.45" stopColor="#FFFFFF" stopOpacity="0.06" />
+            <stop offset="0.46" stopColor="#FFFFFF" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {earned ? (
+          <>
+            <path d={HEX} fill={`url(#body-${uid})`} />
+            <path d={HEX} fill={`url(#gloss-${uid})`} />
+            <path d={HEX_INNER} fill="none" stroke="#000000" strokeOpacity="0.22" strokeWidth="1.6" strokeLinejoin="round" />
+            <path d={HEX} fill="none" stroke={metal.rim} strokeOpacity="0.9" strokeWidth="1.8" strokeLinejoin="round" />
+          </>
+        ) : (
+          <>
+            <path d={HEX} fill="#22201D" />
+            <path d={HEX_INNER} fill="none" stroke="#33312D" strokeWidth="1.6" strokeLinejoin="round" />
+            <path d={HEX} fill="none" stroke="#3B3935" strokeWidth="1.8" strokeLinejoin="round" />
+          </>
+        )}
+      </svg>
+      <Icon
+        className="relative"
+        style={{ width: px * 0.4, height: px * 0.4, color: earned ? metal.ink : '#5C5A56' }}
+        strokeWidth={2.4}
+      />
       {!earned && (
-        <span className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full border border-chess-border bg-surface">
-          <Lock className="h-2.5 w-2.5 text-text-muted" />
+        <span
+          className="absolute -bottom-0.5 -right-0.5 flex items-center justify-center rounded-full border border-chess-border bg-[#1A1916]"
+          style={{ width: Math.max(16, px * 0.34), height: Math.max(16, px * 0.34) }}
+        >
+          <Lock className="text-text-muted" style={{ width: Math.max(9, px * 0.17), height: Math.max(9, px * 0.17) }} />
         </span>
       )}
+    </span>
+  );
+}
+
+/** Gold / silver / bronze rank coin for podiums. */
+export function RankMedal({ rank, size = 28 }: { rank: 1 | 2 | 3; size?: number }) {
+  const uid = useId().replace(/[^a-zA-Z0-9]/g, '');
+  const metal = METAL[rank === 1 ? 'gold' : rank === 2 ? 'silver' : 'bronze'];
+  return (
+    <span className="relative inline-flex items-center justify-center" style={{ width: size, height: size }} aria-label={`Place ${rank}`}>
+      <svg viewBox="0 0 32 32" width={size} height={size} className="absolute inset-0">
+        <defs>
+          <linearGradient id={`coin-${uid}`} x1="0.2" y1="0" x2="0.8" y2="1">
+            <stop offset="0" stopColor={metal.stops[0]} />
+            <stop offset="0.55" stopColor={metal.stops[1]} />
+            <stop offset="1" stopColor={metal.stops[2]} />
+          </linearGradient>
+        </defs>
+        <circle cx="16" cy="16" r="14.5" fill={`url(#coin-${uid})`} stroke={metal.rim} strokeWidth="1.5" />
+        <circle cx="16" cy="16" r="10.5" fill="none" stroke="#000000" strokeOpacity="0.2" strokeWidth="1.2" />
+      </svg>
+      <span className="relative text-[13px] font-black leading-none" style={{ color: metal.ink }}>{rank}</span>
     </span>
   );
 }

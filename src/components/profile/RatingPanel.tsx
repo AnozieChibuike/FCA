@@ -1,9 +1,9 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { TrendingUp } from 'lucide-react';
+import { Flame, TrendingUp } from 'lucide-react';
 import type { Game, GameMode, Profile } from '../../types';
 import { MODES, MODE_LABELS, modeRating } from '../../types';
-import { formatDate, shortEventName } from '../../lib/format';
+import { formatDate, plural, shortEventName } from '../../lib/format';
 import { LineChart, type LinePoint } from '../charts/charts';
 import { Card, Diff, ModeIcon, ResultPill, EmptyState } from '../ui/misc';
 
@@ -154,7 +154,7 @@ export function PerformanceStats({ games, playerId, viewerId }: { games: Game[];
         <div><dt className="text-xs text-text-muted">With white</dt><dd className="font-semibold text-white">{pct(s.ww, s.wg)}% <span className="text-xs font-normal text-text-muted">of {s.wg}</span></dd></div>
         <div><dt className="text-xs text-text-muted">With black</dt><dd className="font-semibold text-white">{pct(s.bw, s.bg)}% <span className="text-xs font-normal text-text-muted">of {s.bg}</span></dd></div>
         <div><dt className="text-xs text-text-muted">Best win streak</dt><dd className="font-semibold text-white">{s.best}</dd></div>
-        <div><dt className="text-xs text-text-muted">Current streak</dt><dd className="font-semibold text-white">{s.cur > 0 ? `🔥 ${s.cur}` : '—'}</dd></div>
+        <div><dt className="text-xs text-text-muted">Current streak</dt><dd className="font-semibold text-white">{s.cur > 0 ? <span className="inline-flex items-center gap-1"><Flame className="h-3.5 w-3.5 text-orange-400" />{s.cur}</span> : '—'}</dd></div>
       </dl>
       <div className="mt-4 space-y-2 border-t border-chess-border pt-3 text-sm">
         {s.rival && (
@@ -172,7 +172,7 @@ export function PerformanceStats({ games, playerId, viewerId }: { games: Game[];
         {s.most && (
           <Link to={compareLink(s.most.id)} className="flex items-center justify-between gap-2 hover:text-primary-light">
             <span className="text-xs text-text-muted">Most played</span>
-            <span className="truncate font-semibold text-white">{s.most.name} <span className="text-xs font-normal text-text-muted">{s.most.games} games</span></span>
+            <span className="truncate font-semibold text-white">{s.most.name} <span className="text-xs font-normal text-text-muted">{plural(s.most.games, 'game')}</span></span>
           </Link>
         )}
         {viewerId && viewerId !== playerId && (

@@ -125,8 +125,8 @@ export default function EventDetail() {
       )}
 
       {status !== 'live' && standings.some((s) => s.fca_rank) && (
-        <div className="grid gap-4 lg:grid-cols-2">
-          <ResultsCard event={event} standings={standings} />
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <ResultsCard event={event} standings={standings} label="Podium" showTitle={false} />
           {highlights.length > 0 && (
             <Card className="p-4 sm:p-5">
               <div className="mb-3 text-xs font-bold uppercase tracking-wider text-primary">Highlights</div>
@@ -197,7 +197,7 @@ export default function EventDetail() {
                   )}
                   <div className="text-right">
                     <div className="font-bold tabular-nums text-white">{s.score}</div>
-                    <div className="text-[10px] text-text-muted">{s.games} games{s.performance ? ` · perf ${s.performance}` : ''}</div>
+                    <div className="text-[10px] text-text-muted">{s.games} game{s.games === 1 ? '' : 's'}{s.performance ? ` · perf ${s.performance}` : ''}</div>
                   </div>
                 </div>
               ))}

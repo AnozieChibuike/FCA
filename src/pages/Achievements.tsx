@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Medal } from 'lucide-react';
+import { Check, Medal } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { fetchAchievementStats, fetchBadgeHolders, fetchPlayerAchievements, type EarnedBadge } from '../lib/api';
 import { formatDate } from '../lib/format';
@@ -50,7 +50,7 @@ export default function Achievements() {
         {['All', ...ACHIEVEMENT_CATEGORIES].map((c) => <Chip key={c} active={category === c} onClick={() => setCategory(c)}>{c}</Chip>)}
       </div>
 
-      <ul className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+      <ul className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
         {list.map((def) => {
           const s = stats[def.key];
           const pct = s && s.active ? Math.round((s.earned / s.active) * 100) : null;
@@ -69,7 +69,7 @@ export default function Achievements() {
                   <div className="line-clamp-2 text-xs text-text-muted">{hidden ? 'Unlock it to find out.' : def.description}</div>
                   <div className="mt-1 text-[11px] text-text-muted">
                     {s ? `${s.earned} player${s.earned === 1 ? '' : 's'}${pct !== null ? ` · ${pct}%` : ''}` : '—'}
-                    {have && <span className="ml-2 font-semibold text-primary">✓ You have it</span>}
+                    {have && <span className="ml-2 inline-flex items-center gap-0.5 font-semibold text-primary"><Check className="h-3 w-3" /> You have it</span>}
                   </div>
                 </div>
               </button>

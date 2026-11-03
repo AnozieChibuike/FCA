@@ -9,7 +9,7 @@ import {
 import { inviteUrl, playerCard, shareImage, shareLink, siteUrl } from '../lib/share';
 import { lichessProfileUrl } from '../lib/lichess';
 import { chesscomProfileUrl } from '../lib/chesscom';
-import { formatDate, ordinal, shortEventName } from '../lib/format';
+import { formatDate, ordinal, plural, shortEventName } from '../lib/format';
 import type { Game, GameMode, PlayerAchievement, Profile as ProfileType, Standing } from '../types';
 import { TITLE_CONFIG, modeRating, totalGames } from '../types';
 import { ModeCards, PerformanceStats, RatingHistory, RecentForm, outcomeFor } from '../components/profile/RatingPanel';
@@ -118,7 +118,7 @@ export default function Profile() {
       });
       const outcome = await shareImage(blob, 'fca-player-card.png', {
         title: `${player!.full_name} on FCA Rated`,
-        text: isOwn ? 'My FCA rating card ♟️ Join me on FCA Rated:' : `${player!.full_name} on FCA Rated`,
+        text: isOwn ? 'My FCA rating card. Join me on FCA Rated:' : `${player!.full_name} on FCA Rated`,
         url: isOwn ? inviteUrl(player!.fca_id) : siteUrl(`/profile/${player!.id}`),
       });
       if (outcome === 'downloaded') toast('Card saved — share it on your status');
@@ -158,7 +158,7 @@ export default function Profile() {
               {player.is_admin && <span className="flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 font-semibold text-primary-light"><ShieldCheck className="h-3 w-3" /> Admin</span>}
               {player.is_arbiter && <span className="flex items-center gap-1 rounded-full bg-sky-500/15 px-2 py-0.5 font-semibold text-sky-300"><ShieldCheck className="h-3 w-3" /> Arbiter</span>}
               {player.is_alumni && <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 font-semibold text-emerald-300">Alumni</span>}
-              {player.gender === 'FEMALE' && <span className="rounded-full bg-rose-500/15 px-2 py-0.5 font-semibold text-rose-300">♀ Female</span>}
+              {player.gender === 'FEMALE' && <span className="rounded-full bg-rose-500/15 px-2 py-0.5 font-semibold text-rose-300">Female</span>}
               {rank && <span className="rounded-full bg-white/5 px-2 py-0.5 font-semibold text-white">#{rank} blitz</span>}
               <span className="rounded-full bg-white/5 px-2 py-0.5 text-text-muted">{player.fca_id}</span>
               {!immortal && <span className="flex items-center gap-1 rounded-full bg-white/5 px-2 py-0.5 text-text-muted"><Clock3 className="h-3 w-3" /> since {formatDate(player.created_at, { month: 'short', year: 'numeric' })}</span>}
@@ -216,14 +216,14 @@ export default function Profile() {
             onChange={setTab}
             options={[
               { value: 'overview', label: 'Overview' },
-              { value: 'games', label: `Games${games.length ? ` (${games.length})` : ''}` },
-              { value: 'badges', label: `Badges${earned.length ? ` (${earned.length})` : ''}` },
+              { value: 'games', label: <>Games{games.length > 0 && <span className="text-[11px] font-medium text-text-muted">{games.length}</span>}</> },
+              { value: 'badges', label: <>Badges{earned.length > 0 && <span className="text-[11px] font-medium text-text-muted">{earned.length}</span>}</> },
               { value: 'events', label: 'Events' },
             ]}
           />
 
           {tab === 'overview' && (
-            <div className="grid gap-4 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
               <div className="space-y-4 lg:col-span-2">
                 <RatingHistory games={games} playerId={player.id} mode={mode} />
                 <RecentForm games={games} playerId={player.id} />
@@ -280,7 +280,7 @@ export default function Profile() {
                     </span>
                     <div className="min-w-0 flex-1">
                       <div className="truncate font-semibold text-white">{shortEventName(s.tournament_title)}</div>
-                      <div className="text-xs text-text-muted">{formatDate(s.tournament_date)} · overall #{s.rank} · {s.games} games</div>
+                      <div className="text-xs text-text-muted">{formatDate(s.tournament_date)} · overall #{s.rank} · {plural(s.games, 'game')}</div>
                     </div>
                     <span className="text-right">
                       <span className="block font-bold tabular-nums text-white">{s.score}</span>

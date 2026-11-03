@@ -99,7 +99,7 @@ export default function Home() {
         <section className="flex items-center justify-between gap-4">
           <div className="min-w-0">
             <p className="text-sm text-text-muted">Welcome back,</p>
-            <h1 className="truncate text-2xl font-extrabold text-white sm:text-3xl">{profile.full_name.split(' ')[0]} 👋</h1>
+            <h1 className="truncate text-2xl font-extrabold text-white sm:text-3xl">{profile.full_name.split(' ')[0]}</h1>
           </div>
           <Link to={`/profile/${profile.id}`} className="flex shrink-0 items-center gap-3 rounded-2xl border border-chess-border bg-surface px-3 py-2">
             <div className="text-right">
@@ -129,7 +129,7 @@ export default function Home() {
       {profile && <OnboardingChecklist profile={profile} />}
 
       {/* Next event + latest results */}
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {data ? (
           data.next ? <NextEventCard event={data.next} /> : (
             <Card className="flex flex-col justify-center p-5">
@@ -151,7 +151,7 @@ export default function Home() {
         <StatTile icon={Activity} label="Active this month" value={data ? data.counts.active : '—'} />
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-5">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
         {/* Top players */}
         <section className="lg:col-span-3">
           <SectionHeader title="Top players" subtitle="Blitz rating · active members" to="/leaderboards" />
