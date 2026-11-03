@@ -4,13 +4,13 @@ import { Edit3, Share2, Image as ImageIcon, Swords, Clock3, UserPlus, Heart, Tro
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
 import {
-  fetchAchievementStats, fetchPlayerAchievements, fetchPlayerGames, fetchPlayerStandings, fetchProfile,
+  fetchAchievementStats, fetchPlayerAchievements, fetchPlayerGames, fetchPlayerStandings, fetchProfile, fetchTitleStats,
 } from '../lib/api';
 import { inviteUrl, playerCard, shareImage, shareLink, siteUrl } from '../lib/share';
 import { lichessProfileUrl } from '../lib/lichess';
 import { chesscomProfileUrl } from '../lib/chesscom';
 import { formatDate, ordinal, plural, shortEventName } from '../lib/format';
-import type { Game, GameMode, PlayerAchievement, Profile as ProfileType, Standing } from '../types';
+import type { Game, GameMode, PlayerAchievement, Profile as ProfileType, Standing, TitleStats } from '../types';
 import { TITLE_CONFIG, modeRating, totalGames } from '../types';
 import { ModeCards, PerformanceStats, RatingHistory, RecentForm, outcomeFor } from '../components/profile/RatingPanel';
 import TitleProgressPill from '../components/profile/TitleProgressPill';
@@ -35,6 +35,7 @@ export default function Profile() {
   const [badges, setBadges] = useState<PlayerAchievement[]>([]);
   const [rarity, setRarity] = useState<Record<string, { earned: number; active: number }>>({});
   const [events, setEvents] = useState<Standing[]>([]);
+  const [titleStats, setTitleStats] = useState<TitleStats | null>(null);
   const [recruits, setRecruits] = useState(0);
   const [rank, setRank] = useState<number | null>(null);
   const [mode, setMode] = useState<GameMode>('BLITZ');
@@ -56,7 +57,7 @@ export default function Profile() {
       // Default the chart to the time control they actually play most.
       const most = (['BLITZ', 'BULLET', 'RAPID', 'CLASSICAL'] as GameMode[]).sort((a, b) => modeRating(p, b).games - modeRating(p, a).games)[0];
       if (version === 0) setMode(most);
-      const [g, b, s, st, rec, higher] = await Promise.all([
+      const [g, b, s, st, rec, higher, ts] = await Promise.all([
         fetchPlayerGames(id).catch(() => []),
         fetchPlayerAchievements(id).catch(() => []),
         fetchPlayerStandings(id).catch(() => []),
@@ -65,11 +66,13 @@ export default function Profile() {
         p.blitz_games > 0
           ? supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('status', 'APPROVED').eq('is_immortal', false).gt('blitz_games', 0).gt('blitz_elo', p.blitz_elo)
           : Promise.resolve({ count: null }),
+        fetchTitleStats(id).catch(() => null),
       ]);
       if (!alive) return;
       setGames(g);
       setBadges(b);
       setEvents(s);
+      setTitleStats(ts);
       setRarity(st);
       setRecruits(rec.count ?? 0);
       setRank(higher.count == null ? null : higher.count + 1);
@@ -211,7 +214,7 @@ export default function Profile() {
       {!immortal && (
         <>
           <ModeCards player={player} mode={mode} onMode={setMode} />
-          <TitleProgressPill player={player} events={events} />
+          <TitleProgressPill player={player} stats={titleStats} />
 
           <Segmented
             value={tab}

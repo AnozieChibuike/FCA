@@ -1,4 +1,4 @@
-import type { FcaTitle, Profile, Standing } from '../types';
+import type { FcaTitle, Profile, TitleStats } from '../types';
 import { TITLE_CONFIG } from '../types';
 
 // Display only: titles are awarded by the database (title_for_stats / refresh_titles).
@@ -38,11 +38,13 @@ export interface TitleProgress {
   targetPodiums: number | null;
   fcaWins: number;
   targetWins: number | null;
+  fgmBeaten: number;
+  targetFgmBeaten: number | null;
   isMaxTitle: boolean;
   isImmortal: boolean;
 }
 
-export function getTitleProgress(player: Profile, events: Standing[] = []): TitleProgress {
+export function getTitleProgress(player: Profile, stats: TitleStats | null): TitleProgress {
   const isImmortal = player.is_immortal || player.fca_id === 'FCA-ETERNAL';
   const currentTitle = isImmortal ? 'FET' : player.earned_title || 'NONE';
 
@@ -54,8 +56,8 @@ export function getTitleProgress(player: Profile, events: Standing[] = []): Titl
     player.peak_classical_elo || player.classical_elo || 1200
   );
 
-  const fcaPodiums = events.filter((e) => e.fca_rank && e.fca_rank <= 3).length;
-  const fcaWins = events.filter((e) => e.fca_rank === 1).length;
+  const fcaPodiums = stats?.podiums ?? 0;
+  const fcaWins = stats?.wins ?? 0;
 
   const step = TITLE_LADDER.indexOf(currentTitle);
   const nextTitle = isImmortal || step < 0 ? null : TITLE_LADDER[step + 1] ?? null;
@@ -72,6 +74,9 @@ export function getTitleProgress(player: Profile, events: Standing[] = []): Titl
     targetPodiums: next?.podiumsNeeded ?? null,
     fcaWins,
     targetWins: next?.winsNeeded ?? null,
+    fgmBeaten: stats?.fgm_beaten ?? 0,
+    // The database lowers this to the number of other FGMs while there are fewer than 2 (0 = waived).
+    targetFgmBeaten: next?.fgmBeatenNeeded ? (stats?.fgm_needed ?? next.fgmBeatenNeeded) || null : null,
     isMaxTitle: !nextTitle,
     isImmortal,
   };

@@ -23,7 +23,9 @@ All files are safe to run more than once.
 Games are the source of truth: ratings, peaks and titles are always rebuilt from them, so late imports, voided games
 and corrected results all land in the right chronological place. Titles are never taken away by a replay.
 
-Titles are awarded by `refresh_titles()` using the rules in `title_for_stats()` (the only copy of the rules). It runs
+Titles are awarded by `refresh_titles()` using the rules in `title_for_stats()` (the only copy of the rules), fed by
+`title_stats()` (podiums and wins only count in events with 8+ FCA members). The web app reads a member's numbers
+through `title_progress()`. `refresh_titles()` runs
 after every re-rate, whenever `tournament_results` change and whenever a member's Lichess handle changes, and it
 unlocks the matching title badges at the same time.
 

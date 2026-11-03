@@ -1,18 +1,23 @@
 -- ===========================================================================
 -- Automatic titles
--- - The title rules live in one place: title_for_stats()
+-- - The title rules live in one place: title_for_stats(), fed by title_stats()
 -- - refresh_titles() awards titles and their badges; it runs automatically after every re-rate,
 --   whenever tournament standings change and whenever a member links or unlinks Lichess
 -- - Title badges follow the earned title only (no more badges from rating alone)
 -- Safe to run more than once.
 -- ===========================================================================
 
--- 25+ rated games (all modes), then peak Elo in any mode, plus FCA finishes for FIM / FGM.
-create or replace function public.title_for_stats(p_peak int, p_games int, p_podiums int, p_wins int)
-returns public.fca_title language sql immutable as $$
+-- The rules. Every title needs 25+ rated games (any mix of modes) and a peak Elo in any mode.
+--   FCM 1400 | FM 1550 | FIM 1700 + 5 podiums | FGM 1800 + 5 podiums + 3 wins + 2 different FGMs beaten
+-- The FGM-beaten requirement drops to the number of other FGMs while there are fewer than 2.
+drop function if exists public.title_for_stats(int, int, int, int);
+create or replace function public.title_for_stats(
+  p_peak int, p_games int, p_podiums int, p_wins int, p_fgm_beaten int, p_fgm_needed int
+) returns public.fca_title language sql immutable as $$
   select (case
     when coalesce(p_games, 0) < 25 then 'NONE'
-    when coalesce(p_peak, 0) >= 1800 and coalesce(p_wins, 0) >= 3 then 'FGM'
+    when coalesce(p_peak, 0) >= 1800 and coalesce(p_podiums, 0) >= 5 and coalesce(p_wins, 0) >= 3
+         and coalesce(p_fgm_beaten, 0) >= coalesce(p_fgm_needed, 0) then 'FGM'
     when coalesce(p_peak, 0) >= 1700 and coalesce(p_podiums, 0) >= 5 then 'FIM'
     when coalesce(p_peak, 0) >= 1550 then 'FM'
     when coalesce(p_peak, 0) >= 1400 then 'FCM'
@@ -20,43 +25,94 @@ returns public.fca_title language sql immutable as $$
   end)::public.fca_title;
 $$;
 
--- Upgrades titles that are now earned (never downgrades) and unlocks the matching badges.
--- Returns the number of members who got a new title.
-create or replace function public.refresh_titles()
-returns int language plpgsql security definer set search_path = public as $$
-declare
-  v_awarded int;
-begin
-  with finishes as (
+-- Everything the rules look at, per member. Podiums and wins only count in events with
+-- 8+ FCA members; FGMs beaten counts different current FGMs beaten in official games.
+create or replace function public.title_stats()
+returns table (player_id uuid, peak int, games int, podiums int, wins int, fgm_beaten int, fgm_needed int)
+language sql stable security definer set search_path = public as $$
+  with big_events as (
+    select s.tournament_id
+      from public.tournament_standings s
+     where s.fca_rank is not null
+     group by s.tournament_id
+    having count(*) >= 8
+  ),
+  finishes as (
     select s.player_id,
            (count(*) filter (where s.fca_rank <= 3))::int as podiums,
            (count(*) filter (where s.fca_rank = 1))::int as wins
       from public.tournament_standings s
+      join big_events e on e.tournament_id = s.tournament_id
      where s.fca_rank is not null
      group by s.player_id
   ),
-  calc as (
-    select p.id,
-           public.title_for_stats(
-             greatest(coalesce(p.peak_blitz_elo, 0), coalesce(p.peak_rapid_elo, 0),
-                      coalesce(p.peak_bullet_elo, 0), coalesce(p.peak_classical_elo, 0)),
-             coalesce(p.blitz_games, 0) + coalesce(p.rapid_games, 0) + coalesce(p.bullet_games, 0) + coalesce(p.classical_games, 0),
-             coalesce(f.podiums, 0),
-             coalesce(f.wins, 0)
-           ) as title
-      from public.profiles p
-      left join finishes f on f.player_id = p.id
-     where not p.is_immortal
+  fgms as (
+    select p.id from public.profiles p where p.earned_title = 'FGM' and not p.is_immortal
   ),
-  upd as (
-    update public.profiles p
-       set earned_title = c.title
-      from calc c
-     where p.id = c.id
-       and public.title_rank(c.title) > public.title_rank(p.earned_title)
-    returning 1
+  fgm_beaten as (
+    select w.winner as player_id, (count(distinct w.loser))::int as beaten
+      from (
+        select case when g.result = 1 then g.white_player_id else g.black_player_id end as winner,
+               case when g.result = 1 then g.black_player_id else g.white_player_id end as loser
+          from public.games g
+         where g.is_official is not false
+           and g.result in (0, 1)
+           and g.white_player_id <> g.black_player_id
+      ) w
+      join fgms f on f.id = w.loser
+     group by w.winner
   )
-  select count(*) into v_awarded from upd;
+  select p.id,
+         greatest(coalesce(p.peak_blitz_elo, 0), coalesce(p.peak_rapid_elo, 0),
+                  coalesce(p.peak_bullet_elo, 0), coalesce(p.peak_classical_elo, 0)),
+         coalesce(p.blitz_games, 0) + coalesce(p.rapid_games, 0) + coalesce(p.bullet_games, 0) + coalesce(p.classical_games, 0),
+         coalesce(f.podiums, 0),
+         coalesce(f.wins, 0),
+         coalesce(b.beaten, 0),
+         least(2, (select count(*) from fgms x where x.id <> p.id))::int
+    from public.profiles p
+    left join finishes f on f.player_id = p.id
+    left join fgm_beaten b on b.player_id = p.id
+   where not p.is_immortal;
+$$;
+
+revoke execute on function public.title_stats() from public, anon, authenticated;
+
+-- One member's numbers for the profile's title progress card.
+create or replace function public.title_progress(p_player_id uuid)
+returns jsonb language sql stable security definer set search_path = public as $$
+  select to_jsonb(s) - 'player_id' from public.title_stats() s where s.player_id = p_player_id;
+$$;
+
+grant execute on function public.title_progress(uuid) to anon, authenticated;
+
+-- Upgrades titles that are now earned (never downgrades) and unlocks the matching badges.
+-- Repeats until nothing changes, because a new FGM can complete someone else's FGM requirement.
+-- Returns the number of title upgrades.
+create or replace function public.refresh_titles()
+returns int language plpgsql security definer set search_path = public as $$
+declare
+  v_round int;
+  v_awarded int := 0;
+begin
+  loop
+    with calc as (
+      select s.player_id,
+             public.title_for_stats(s.peak, s.games, s.podiums, s.wins, s.fgm_beaten, s.fgm_needed) as title
+        from public.title_stats() s
+    ),
+    upd as (
+      update public.profiles p
+         set earned_title = c.title
+        from calc c
+       where p.id = c.player_id
+         and public.title_rank(c.title) > public.title_rank(p.earned_title)
+      returning 1
+    )
+    select count(*) into v_round from upd;
+    exit when v_round = 0;
+    v_awarded := v_awarded + v_round;
+  end loop;
 
   -- Every title badge up to the member's title. A badge keeps the date it was first unlocked.
   insert into public.player_achievements (player_id, achievement_key, earned_at, progress, target, updated_at)

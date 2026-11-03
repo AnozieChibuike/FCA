@@ -1,17 +1,17 @@
 import { useMemo } from 'react';
-import { Award, CheckCircle2, Crown, Sparkles, Trophy, Zap } from 'lucide-react';
-import type { Profile, Standing } from '../../types';
+import { Award, CheckCircle2, Crown, Sparkles, Swords, Trophy, Zap, type LucideIcon } from 'lucide-react';
+import type { Profile, TitleStats } from '../../types';
 import { TITLE_CONFIG } from '../../types';
 import { getTitleProgress } from '../../lib/elo';
 import { TitleBadge } from '../ui/Avatar';
 
 interface TitleProgressPillProps {
   player: Profile;
-  events?: Standing[];
+  stats: TitleStats | null;
 }
 
-export default function TitleProgressPill({ player, events = [] }: TitleProgressPillProps) {
-  const progress = useMemo(() => getTitleProgress(player, events), [player, events]);
+export default function TitleProgressPill({ player, stats }: TitleProgressPillProps) {
+  const progress = useMemo(() => getTitleProgress(player, stats), [player, stats]);
 
   if (progress.isImmortal) {
     return (
@@ -42,14 +42,6 @@ export default function TitleProgressPill({ player, events = [] }: TitleProgress
   const nextCfg = progress.nextTitle ? TITLE_CONFIG[progress.nextTitle] : null;
   if (!nextCfg || !progress.targetElo) return null;
 
-  const eloDone = progress.peakElo >= progress.targetElo;
-  const gamesDone = progress.totalGames >= progress.minGamesRequired;
-  const podiumsDone = progress.targetPodiums == null || progress.fcaPodiums >= progress.targetPodiums;
-  const winsDone = progress.targetWins == null || progress.fcaWins >= progress.targetWins;
-
-  const eloPercent = Math.min(100, Math.round((progress.peakElo / progress.targetElo) * 100));
-  const gamesPercent = Math.min(100, Math.round((progress.totalGames / progress.minGamesRequired) * 100));
-
   return (
     <div className="rounded-2xl border border-chess-border bg-[#1E1C18]/90 p-3.5 shadow-sm sm:p-4">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.06] pb-3">
@@ -65,126 +57,61 @@ export default function TitleProgressPill({ player, events = [] }: TitleProgress
       </div>
 
       <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2 md:grid-cols-3">
-        {/* Peak Elo requirement */}
-        <div className="rounded-xl border border-white/[0.04] bg-surface/60 p-2.5">
-          <div className="flex items-center justify-between text-xs">
-            <span className="flex items-center gap-1.5 text-text-muted">
-              <Zap className="h-3 w-3 text-primary-light" /> Peak Elo
-            </span>
-            <span className="font-semibold tabular-nums text-white">
-              {progress.peakElo} <span className="text-text-muted font-normal">/ {progress.targetElo}</span>
-            </span>
-          </div>
-          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
-            <div
-              className={`h-full rounded-full transition-all duration-300 ${eloDone ? 'bg-emerald-400' : 'bg-primary'}`}
-              style={{ width: `${eloPercent}%` }}
-            />
-          </div>
-          <div className="mt-1 flex justify-end">
-            {eloDone ? (
-              <span className="flex items-center gap-1 text-[10px] font-semibold text-emerald-400">
-                <CheckCircle2 className="h-2.5 w-2.5" /> Met
-              </span>
-            ) : (
-              <span className="text-[10px] text-text-muted tabular-nums">
-                {progress.targetElo - progress.peakElo} Elo away
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* 25 Games requirement */}
-        <div className="rounded-xl border border-white/[0.04] bg-surface/60 p-2.5">
-          <div className="flex items-center justify-between text-xs">
-            <span className="flex items-center gap-1.5 text-text-muted">
-              <Trophy className="h-3 w-3 text-sky-400" /> Rated Games
-            </span>
-            <span className="font-semibold tabular-nums text-white">
-              {progress.totalGames} <span className="text-text-muted font-normal">/ {progress.minGamesRequired}</span>
-            </span>
-          </div>
-          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
-            <div
-              className={`h-full rounded-full transition-all duration-300 ${gamesDone ? 'bg-emerald-400' : 'bg-sky-400'}`}
-              style={{ width: `${gamesPercent}%` }}
-            />
-          </div>
-          <div className="mt-1 flex justify-end">
-            {gamesDone ? (
-              <span className="flex items-center gap-1 text-[10px] font-semibold text-emerald-400">
-                <CheckCircle2 className="h-2.5 w-2.5" /> Established
-              </span>
-            ) : (
-              <span className="text-[10px] text-text-muted tabular-nums">
-                {progress.minGamesRequired - progress.totalGames} more to establish
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Podiums for FIM or Wins for FGM */}
+        <Requirement icon={Zap} iconClass="text-primary-light" bar="bg-primary" label="Peak Elo"
+          value={progress.peakElo} target={progress.targetElo} done="Met" todo={(n) => `${n} Elo away`} />
+        <Requirement icon={Trophy} iconClass="text-sky-400" bar="bg-sky-400" label="Rated Games"
+          value={progress.totalGames} target={progress.minGamesRequired} done="Established" todo={(n) => `${n} more to establish`} />
         {progress.targetPodiums != null && (
-          <div className="rounded-xl border border-white/[0.04] bg-surface/60 p-2.5 sm:col-span-2 md:col-span-1">
-            <div className="flex items-center justify-between text-xs">
-              <span className="flex items-center gap-1.5 text-text-muted">
-                <Crown className="h-3 w-3 text-amber-400" /> FCA Podiums
-              </span>
-              <span className="font-semibold tabular-nums text-white">
-                {progress.fcaPodiums} <span className="text-text-muted font-normal">/ {progress.targetPodiums}</span>
-              </span>
-            </div>
-            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
-              <div
-                className={`h-full rounded-full transition-all duration-300 ${podiumsDone ? 'bg-emerald-400' : 'bg-amber-400'}`}
-                style={{ width: `${Math.min(100, Math.round((progress.fcaPodiums / progress.targetPodiums) * 100))}%` }}
-              />
-            </div>
-            <div className="mt-1 flex justify-end">
-              {podiumsDone ? (
-                <span className="flex items-center gap-1 text-[10px] font-semibold text-emerald-400">
-                  <CheckCircle2 className="h-2.5 w-2.5" /> Qualified
-                </span>
-              ) : (
-                <span className="text-[10px] text-text-muted tabular-nums">
-                  {progress.targetPodiums - progress.fcaPodiums} more podiums
-                </span>
-              )}
-            </div>
-          </div>
+          <Requirement icon={Crown} iconClass="text-amber-400" bar="bg-amber-400" label="FCA Podiums"
+            value={progress.fcaPodiums} target={progress.targetPodiums} done="Qualified" todo={(n) => `${n} more podiums`} />
         )}
-
         {progress.targetWins != null && (
-          <div className="rounded-xl border border-white/[0.04] bg-surface/60 p-2.5 sm:col-span-2 md:col-span-1">
-            <div className="flex items-center justify-between text-xs">
-              <span className="flex items-center gap-1.5 text-text-muted">
-                <Crown className="h-3 w-3 text-rose-400" /> FCA Wins
-              </span>
-              <span className="font-semibold tabular-nums text-white">
-                {progress.fcaWins} <span className="text-text-muted font-normal">/ {progress.targetWins}</span>
-              </span>
-            </div>
-            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
-              <div
-                className={`h-full rounded-full transition-all duration-300 ${winsDone ? 'bg-emerald-400' : 'bg-rose-400'}`}
-                style={{ width: `${Math.min(100, Math.round((progress.fcaWins / progress.targetWins) * 100))}%` }}
-              />
-            </div>
-            <div className="mt-1 flex justify-end">
-              {winsDone ? (
-                <span className="flex items-center gap-1 text-[10px] font-semibold text-emerald-400">
-                  <CheckCircle2 className="h-2.5 w-2.5" /> Qualified
-                </span>
-              ) : (
-                <span className="text-[10px] text-text-muted tabular-nums">
-                  {progress.targetWins - progress.fcaWins} more 1st-place wins
-                </span>
-              )}
-            </div>
-          </div>
+          <Requirement icon={Crown} iconClass="text-rose-400" bar="bg-rose-400" label="FCA Wins"
+            value={progress.fcaWins} target={progress.targetWins} done="Qualified" todo={(n) => `${n} more 1st-place wins`} />
+        )}
+        {progress.targetFgmBeaten != null && (
+          <Requirement icon={Swords} iconClass="text-rose-400" bar="bg-rose-400" label="FGMs Beaten"
+            value={progress.fgmBeaten} target={progress.targetFgmBeaten} done="Qualified" todo={(n) => `beat ${n} more FGM${n === 1 ? '' : 's'}`} />
+        )}
+      </div>
+      {(progress.targetPodiums != null || progress.targetWins != null) && (
+        <p className="mt-2 text-[10px] text-text-muted">Podiums and wins count in events with 8+ FCA members.</p>
+      )}
+    </div>
+  );
+}
+
+
+function Requirement({ icon: Icon, iconClass, bar, label, value, target, done, todo }: {
+  icon: LucideIcon; iconClass: string; bar: string; label: string;
+  value: number; target: number; done: string; todo: (remaining: number) => string;
+}) {
+  const met = value >= target;
+  return (
+    <div className="rounded-xl border border-white/[0.04] bg-surface/60 p-2.5">
+      <div className="flex items-center justify-between gap-2 text-xs">
+        <span className="flex min-w-0 items-center gap-1.5 text-text-muted">
+          <Icon className={`h-3 w-3 shrink-0 ${iconClass}`} /> <span className="truncate">{label}</span>
+        </span>
+        <span className="shrink-0 font-semibold tabular-nums text-white">
+          {value} <span className="font-normal text-text-muted">/ {target}</span>
+        </span>
+      </div>
+      <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+        <div
+          className={`h-full rounded-full transition-all duration-300 ${met ? 'bg-emerald-400' : bar}`}
+          style={{ width: `${Math.min(100, Math.round((value / target) * 100))}%` }}
+        />
+      </div>
+      <div className="mt-1 flex justify-end">
+        {met ? (
+          <span className="flex items-center gap-1 text-[10px] font-semibold text-emerald-400">
+            <CheckCircle2 className="h-2.5 w-2.5" /> {done}
+          </span>
+        ) : (
+          <span className="text-[10px] tabular-nums text-text-muted">{todo(target - value)}</span>
         )}
       </div>
     </div>
   );
 }
-

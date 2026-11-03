@@ -1,7 +1,7 @@
 import { FunctionsHttpError } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 import type {
-  Game, PlayerAchievement, Profile, Recruiter, Season, SeasonStanding, Standing, TournamentSummary,
+  Game, PlayerAchievement, Profile, Recruiter, Season, SeasonStanding, Standing, TitleStats, TournamentSummary,
 } from '../types';
 
 /** Every public profile column. Never select('*') on profiles: phone and reg number are private. */
@@ -132,6 +132,12 @@ export async function fetchStandings(tournamentId: string): Promise<Standing[]> 
   const { data, error } = await supabase.from('tournament_standings').select('*').eq('tournament_id', tournamentId).order('rank');
   if (error) throw error;
   return (data ?? []) as Standing[];
+}
+
+export async function fetchTitleStats(playerId: string): Promise<TitleStats | null> {
+  const { data, error } = await supabase.rpc('title_progress', { p_player_id: playerId });
+  if (error) throw error;
+  return (data ?? null) as TitleStats | null;
 }
 
 export async function fetchPlayerStandings(playerId: string): Promise<Standing[]> {

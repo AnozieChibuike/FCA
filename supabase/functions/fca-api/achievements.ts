@@ -65,7 +65,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { key: 'title_fcm', name: 'Candidate Master', description: 'Earn the FCM title: 1400 peak and 25+ rated games.', category: 'Rating', tier: 'gold', icon: 'GraduationCap', target: 1400 },
   { key: 'title_fm', name: 'FCA Master', description: 'Earn the FM title: 1550 peak and 25+ rated games.', category: 'Rating', tier: 'platinum', icon: 'Medal', target: 1550 },
   { key: 'title_fim', name: 'International Master', description: 'Earn the FIM title: 1700 peak, 5 FCA podiums and 25+ rated games.', category: 'Rating', tier: 'legendary', icon: 'Globe', target: 1700 },
-  { key: 'title_fgm', name: 'Grandmaster', description: 'Earn the FGM title: 1800 peak, 3 FCA wins and 25+ rated games.', category: 'Rating', tier: 'legendary', icon: 'Crown', target: 1800 },
+  { key: 'title_fgm', name: 'Grandmaster', description: 'Earn the FGM title: 1800 peak, 5 FCA podiums, 3 FCA wins, 2 FGMs beaten and 25+ rated games.', category: 'Rating', tier: 'legendary', icon: 'Crown', target: 1800 },
   { key: 'rocket_50', name: 'Rocket', description: 'Gain 50+ rating points in a single event.', category: 'Rating', tier: 'silver', icon: 'TrendingUp', target: 50 },
   { key: 'rocket_100', name: 'Comet', description: 'Gain 100+ rating points in a single event.', category: 'Rating', tier: 'gold', icon: 'Rocket', target: 100 },
 
